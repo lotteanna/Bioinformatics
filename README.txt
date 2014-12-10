@@ -1,0 +1,8 @@
+- GBS_raw2filtered: raw paired end GBS reads to alignment ready files;
+- GBS_bwa: Align filtered paired end GBS reads with fragmented reference genome
+- GBS_gatk: Indel realignment, Calling SNPs and Genotypes using UG and HaplotypeCaller
+- GBS_vcffilter: filtering vcf files with custom perl scripts
+- GBS_STRUCTURE: transforming custom SNP and genotype tables to STRUCTURE and running the program
+- GBS_BayEnv
+- GBS_LFMM
+- GBS_Stacks: de novo assembly of paired end GBS reads
