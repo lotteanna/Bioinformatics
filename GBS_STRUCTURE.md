@@ -9,10 +9,11 @@ A)
 STRUCTURE can't deal with linked loci, so need to select at random one SNP per contig
 
 ```
-perl /nfs/home/hpcsci/lotteanv/scripts/random_one_per_locus_combined.pl snptableUG.tab.table.contig
+perl /nfs/home/hpcsci/lotteanv/scripts/random_one_per_locus_combined_lotte.pl snptableUG.tab.table.contig
 ```
 
 Check if number of selected contigs is the same as number of unique contigs
+
 ```
 awk 'NR!=1{print $1}' snptableUG.tab.table.contig | sort | uniq -c | wc -l
 ```
@@ -25,18 +26,13 @@ awk 'NR!=1{print $1}' snptableUG.tab.table.contig.random | wc -l
 B)
 Convert the SNPtable to a STRUCTURE readable format
 
- NOTE: the order of the digital numbers is mixed up (eg AC can now be read in by Structure as CA. This means linkage mapping is impossible with this data (see Structure documentation). This is caused by the coding used initially, which is by vcf2vertical_dep_GATK_UG.pl
+NOTE: the order of the digital numbers is mixed up (eg AC can now be read in by Structure as CA. This means linkage mapping is impossible with this data (see Structure documentation). This is caused by the coding used initially, which is by vcf2vertical_dep_GATK_UG.pl
 
 First, make a population document (popind) for the conversion script, which is a tab separated file. The following seems to work (don't enter the headers):
 pop        sampleID
 010908-1	2-010908-1-17
 010908-1	2-010908-1-9
 010908-1	1-010908-1-27
-010908-1	1-010908-1-12
-010908-1	6-010908-1-7
-010908-1	6-010908-1-22
-160808-1	2-160808-1-11
-160808-1	1-160808-1-12
 etc
 
 The original file I have to translate is called snptableUG.tab.192.table.contig.random. This file is structured as follows:
@@ -48,13 +44,15 @@ Columns:
 
 This table doesn't neatly have the genotypes spelled out as AA, AT, GC etc, but uses the combined coding for genotypes: A, N, W, etc.
 
-First of all, as I understand from the STRUCTURE manual and your 'structure_input_file.R' script, I have to divide the data into 2 rows per individual, each row for one of the 2 alleles (as ragweed is diploid). So my plan is to:
 - Digitalise and separated genotypes for each allele ('A' = 1,1; 'N' = -9,-9; 'W' = 1,2 etc)
 - Concatenate Chrom and Locus Location
 - Add in population information for each individual (through popind file)
 - Transpose columns and put them in the right order for STRUCTURE
+- Optional: Write data for each individual in 2 rows (ONEROWPERIND=0 if divided in 2 rows)
 
-Run the conversion script:
+
+-------
+Run the conversion script in Perl (R script is below):
 ```
 #########################################################################
 # SNPtable2structure_combined_lotte                                     #
@@ -181,35 +179,369 @@ print OUT "\n";
 ```
 
 In command line:
-``` perl ~/scripts/SNPtable2structure_combined_lotte.pl snptableUG.tab.192.table.contig.random rand.structure popind```
+```
+perl ~/scripts/SNPtable2structure_combined_lotte.pl snptableUG.tab.192.table.contig.random rand.structure popind
+```
 
 It prints out the rand.structure table with per line the following:
 popID \t sampleID \t \t Chrom_pos1 \t Chrom_pos2 etc.
 
+I am pretty sure that the script assumes that the individuals in the popind file are sorted in the same way as the header of snptableUG.tab.192.table.contig.random.
+Also, this script prints out
 
-I am not happy with this file as somehow I lost the 2nd allele. Also, I am pretty sure that the script assumes that the individuals in the popind file are sorted in the same way as the header of snptableUG.tab.192.table.contig.random.
 
 ```
 cat rand.structure | wc -l 
-``` shows that it didn't procude 2 lines per individual...
+```
 
-Looking at Ander's R script (structure_input_file.R), I should be able to melt and cast the table into the right format. For this, I would first melt each individual to the rows (and proceed as in your example). I've never used these functions before so not quite sure how to do this for all the 384 individuals. Also, I would not know how to link the populationIDs and translate the genotypes to digital alleles.
+shows that it didn't produce 2 lines per individual...
 
-I can't yet get it to work without providing pop information, but I reckon that IF you want to run this into STRUCTURE without any prior population knowledge, just say all pops are 1.
-Or something similar. 
 
- 
-structure -m mainparams
+-------------------
 
-No admixtrure model: assign individuals/units
-Admixture model: assigns genotypes
 
-if alpha = 1 = flat prior
+Use R script written by Anders Gonçalves da Silva (2014):
 
-Run replica runs for every chosen K, at least 20 per K.
+```
+### SNPTable2STR
+
+#### Auxiliary functions #####
+
+#conversion table
+
+genotypeCodes = list("A"=c(1,1),
+"T"=c(2,2),
+"C"=c(3,3),
+"G"=c(4,4),
+"Y"=c(2,3), #C or T
+"R"=c(1,4),  #A or G
+"S"=c(3,4), #G or C
+"W"=c(1,2), #A or T
+"K"=c(2,4), #G or T
+"M"=c(1,3), #A or C
+"N"=c(-9,-9),
+"-"=c(-9,-9))
+
+# xref inds and pops
+
+xref_ind = function(popinfo,indlist){
+popinfo = popInfo
+indlist = inds
+#figure out number of populations and number of samples per pop
+tallyPops = table(popinfo$pop)
+nPops = length(tallyPops)
+
+#number the populations
+popIndex = 1:nPops
+names(popIndex)<-names(tallyPops)
+
+#dictionary of populations
+popIndDic = popinfo$pop
+names(popIndDic) = popinfo$ind
+
+return(list(pIx=popIndex,pDic=popIndDic))
+}
+
+description = function(){
+cat(paste(rep("#",80),sep="",collapse=""),"\n")
+cat("usage:\n")
+cat("snpTable2str.R <snptable> <poptable> <outfile>\n")
+cat("\n\n")
+cat("This script takes three input parameters:\n")
+cat("\t\tsnptable: a filename. File contains a SNP genotype matrix (locus x individuals)\n\n")
+cat("\t\tpoptable: a filename. File contains a tab delimited table mapping individuals to populations (pop,ind)\n\n")
+cat("\t\toutfile: a filename. File to save structure output. Two lines per individual, plus one row of loci names (identified as CHROM_POS)\n\n")
+cat(paste(rep("#",80),sep="",collapse=""),"\n\n")
+}
+
+####### main script ########
+
+args <-commandArgs(trailingOnly=T)
+
+if(length(args) != 3){
+description()
+} else {
+genTable = read.table(args[[1]],header=T)
+
+popInfo = read.table(args[[2]],header=F)
+names(popInfo) = c("pop","ind")
+
+#ind index x-ref
+## individual genotype list
+inds=gsub(pattern = "X",replacement = "",names(genTable)[3:length(names(genTable))])
+inds = gsub("\\.","-",inds)
+
+xrefIndex = xref_ind(popIndex,inds)
+
+outfile = args[[3]]
+
+#create locus id line
+loci = paste(genTable$CHROM,genTable$POS,sep="_",collapse="\t")
+cat(loci,"\n",file=outfile)
+
+#create a vector to catch individuals that fail to cross reference to a population
+missingPop = c()
+
+#counter for total number of individuals successfully converted and saved to file
+nInd = 0
+
+#loop through columsn of genTable, create one big string with all converted genotypes
+# this will save in time by saving to file only once
+for(i in 1:length(inds)){
+recodedGenotypes = matrix(unlist(genotypeCodes[as.character(genTable[,i+2])]),nrow=2)
+ind = inds[i]
+pop = as.character(xrefIndex$pIx[xrefIndex$pDic[inds[i]]])
+
+#check if pop cross-reference failed
+if(is.na(pop)){
+missingPop = c(missingPop,ind)
+next
+}
+
+nInd = nInd + 1
+
+strGeno=paste0(paste(paste(ind,pop,sep="\t"),apply(recodedGenotypes,1,paste,collapse="\t")),collapse="\n")
+outputGenos=ifelse(i==1,strGeno,paste(outputGenos,strGeno,sep="\n"))
+}
+
+#save genotypes to file
+cat(outputGenos,"\n",file=outfile,append=T)
+
+#finish things off
+cat("Conversion finished\n")
+cat("Converted ",as.character(nrow(genTable))," loci and ",as.character(nInd)," individuals\n")
+if(length(missingPop)>0){
+cat("A total of ",length(missingPop)," individuals had no pop assignment and were skipped:\n")
+for(i in missingPop){
+cat("\t\t",i,"\n")
+}
+cat("The list is saved in the file missingPop.txt\n")
+write.table(x = missingPop,file = "missingPop.txt",row.names = F,col.names = F)
+}
+cat("\n")
+}
+
+```
+
+Run this by typing (make sure to have R version 2.15 or higher loaded):
+
+```
+Rscript snpTable2str.R <snptable> <poptable> <outfile>
+```
+
+---
+C)
+Now, we need a set of mainparams and extraparams to start some runs. These parameters depend on the input file, as well as several assumptions made by the user. These assumptions depend on the situation (i.e. admixture, no admixture) or require tweaking by the user.
+
+Helpful information:
+Evanno et al 2005: Detecting the number of clusters of individuals using the software STRUCTURE: a simulation study.
+
+Porras-Hurtado et al 2013: An overview of STRUCTURE: applications, parameter settings, and supporting software
+
+http://pritchardlab.stanford.edu/structure_software/release_versions/v2.3.4/structure_doc.pdf
+
+>   No admixture model: assign individuals/units
+>   Admixture model: assigns genotypes
+>   if alpha = 1 = flat prior
+>   Use long burning times (min 100,000)
+>   Run replica runs for every chosen K, at least 20 per K.
+---
+
+D)
+Great! Now start some runs, preferably in parallel. Ideally, we want to work our way up the ultimate number of iterations and long burnin times, but start with some subsamples and small runs to evaluate the data.
+
+```
+#!/bin/sh
+
+module load structure/2.3.4
+
+START=$(date +%s)
+
+maxRep=$1
+
+for i in $(eval echo "{1..$2}")
+do
+task_id=$i
+echo "This is task number $task_id\n"
+K=$[1+($task_id/$maxRep)]`
+rep=$[($K*$maxRep)-$task_id]
+out=`echo output_K"$K"_r"$rep"`
+chain=`echo chain_K"$K"_r"$rep"`
+seed=`eval od -vAn -N4 -tu4 < /dev/urandom`
+structure -K $K -o $out -D $seed > $chain
+END=$(date +%s)
+DIFF=$(echo "$END - $START" | bc)
+echo "Finished job K=$K, replicate=$rep, and took $DIFF seconds. It had seed $seed" >> log
+done
+
+```
+
+Run this on the command line using
+bash par_struc.sh <max number of repetitions> <max number of tasks>
+
+OR (much better option)
+
+log a job to run it parallel.
+
+
+E)
 
 Output from STRUCTURE cannot be used in R, needs to be parsed by using the python script parse_struc.py
 
-Use long burning times (min 100,000)
+```
+#!/usr/bin/env python
+'''
+parse_struc.py <chain_prefix>
 
-Evanno etal 2005: Detecting the number of clusters in Structure, check how fast the log-likelihood changes from K to the next K.
+e.g.,
+
+./parse_struc.py chain_K2
+'''
+
+import sys,os,re,string
+
+prefix = sys.argv[1]
+
+def find_files(prefix):
+'''
+will return a list of files in the current directory that contain the prefix
+'''
+return [f for f in os.listdir('.') if re.search(prefix,f)]
+
+def parse_files(filelist,prefix):
+'''
+output a file prefix_sum.txt with the summary chains
+'''
+fo = open(prefix+'_sum.txt','w')
+file_count = 0
+out = []
+for f in filelist:
+print f
+fi = open(f,'r')
+rep = f.split('_')[-1]
+tmp1 = []
+count = 0
+start = 0
+mycounter = 0
+for line in fi:
+tmp = line.strip().lstrip()
+if re.search('starting MCMC',tmp) and start == 0:
+start = 1
+if re.search('[0-9]{3,}:',tmp) and start == 1:
+tmp1.append(re.sub(':','',tmp))
+else:
+if re.search('BURNIN completed',tmp):
+count = 1
+else:
+if count==1 and re.search('Rep#:',tmp) and file_count==0:
+header=tmp
+header = re.sub('[ ]{2,}',';',header)
+header = re.sub('[ ,]{1}','_',header)
+header = re.sub(';',' ',header)
+header = re.sub('Rep#:','Step',header)
+header = 'Rep '+ header
+count +=1
+file_count+=1
+else:
+continue
+#tmp1 = [re.sub(':','',r.strip().lstrip()) for r in fi if re.search('[0-9]{3,}:',r)]
+tmp2 = [re.sub('[ ]{1,}',' ',r) for r in tmp1]
+tmp3 = [re.sub('--','- -',r) for r in tmp2]
+tmp4 = [rep+' '+r+'\n' for r in tmp3]
+out.extend(tmp4)
+
+fo.write(header+'\n')
+for r in out:
+fo.write(r)
+fo.close()
+return out
+
+if __name__=="__main__":
+flist = find_files(prefix)
+parse_files(flist,prefix)
+```
+
+Now in the directory where all the outputs are:
+
+```
+python ~/scripts/parse_struc.py chain_K1_ #(etc, for every K)
+```
+
+This will create a *sum.txt file for every K
+
+F)
+Run structureHarvester.py on structure outputs
+http://users.soe.ucsc.edu/~dearl/software/structureHarvester/
+
+```
+python structureHarvester.py --dir=structure_output --out=clumpp_files --evanno --clumpp
+```
+
+NOTE: this script has to be WITHIN the dir where the in and output dirs are located, otherwise it won't run. Make sure to load python version 2.6.6'
+
+OR
+
+Zip all the *_f files (produced by STRUCTURE) and upload to
+http://taylor0.biology.ucla.edu/structureHarvester/
+
+
+G)
+This output can be checked with structure_analysis.R
+
+```{r}
+#structure run analysis
+library(ggplot2)
+
+#first run the parse_struc.py script
+
+#load chain
+chain_k2 = read.table("chain_K2_sum.txt",header=T,na.strings='-')
+
+#plot alpha chains across Reps
+ggplot(chain_k2,aes(x=Step,y=Alpha,col=Rep))+geom_line()
+
+#check alpha histograms
+ggplot(chain_k2,aes(x=Alpha))+geom_histogram()+facet_grid(Rep~.)
+
+#plot LnLike chain
+ggplot(chain_k2,aes(x=Step,y=Ln_Like,col=Rep))+geom_line()
+
+#check Ln_Like histograms
+ggplot(chain_k2,aes(x=Ln_Like))+geom_histogram()+facet_grid(Rep~.)
+
+#check correlation between F
+ggplot(chain_k2,aes(x=F1,y=F2))+geom_point()+coord_fixed(0.5)+facet_grid(Rep~.)
+
+################################################################
+# plotting evanno data after applying structureHarvester.py
+
+evanno_res = read.table("evanno.txt",header=F,comment.char='#')
+names(evanno_res) = c("K","reps","mean_LnPK",	"sd_LnPK",	"Ln1K",	"Ln2K",	"Delta_K")
+
+ggplot(evanno_res, aes(x=K, y=mean_LnPK)) + geom_errorbar(aes(ymin=mean_LnPK-sd_LnPK, ymax=mean_LnPK+sd_LnPK), width=.1) + geom_line() + geom_point()
+
+ggplot(evanno_res, aes(x=K, y=Delta_K)) + geom_line() + geom_point()
+
+```
+
+H)
+Running CLUMPP
+https://web.stanford.edu/group/rosenberglab/clumpp.html
+
+CLUMPP expects a parameter file which is based on the number of clusters (K), the number of individuals or populations – depending on you're running datatype 0 or 1, 0 being for the indfiles and 1 for the population files – the number of runs (I think determined by the number of runs you ran in Structure) and other options. This parameter file will call output files produced by structureHarvester, K1.indfile, K1.popfile etc.
+
+In command line type
+```
+CLUMPP paramfile #mcc version
+```
+
+I)
+Running Distruct
+Rename the .output files from CLUMPP to .indivq and .popq for the indivual and population run respectively
+
+```
+module load distrust
+distructLinux1.1
+ps K2.ps
+```
+
