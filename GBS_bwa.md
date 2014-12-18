@@ -1,25 +1,34 @@
-BWA - GBS paired end files alignment to fragmented reference genome
-
+BWA - GBS paired end files alignment to reference genome
 ===
 
-Align paired files to crappy reference (WGS) using BWA (NB: I chopped everything up in
-one-liners but these can be put together in a script)
+This walkthrough shows how to align paired files to the reference (WGS) using BWA and checks how many reads have been mapped.
+**Note** that this walkthrough assumes inputs as produces by the *GBS_raw2filtered* walkthrough.
+
+Set up working space
+In the desired directory, set up the working space required for this walkthrough:
+
 ```
-. /etc/profile
-module load bwa
+mkdir align
 ```
 
-A) Rename sequence identifier of fq files. 
+This walkthrough starts in the 'paired' directory as created in the *GBS_raw2filtered* walkthrough.
 
-During process.radtags, stacks renamed R1 and R2 sequence identifiers to _1 and _2. When running bwa mem it expects same file names or an error will appear, e.g. [mem_sam_pe] paired reads have different names: 
-"5_1202_2403_86748_1", "5_1202_2403_86748_2" 
-```sed 's/_1$//g' filenameR1 > newfilenameR1```
-```sed 's/_2$//g' filenameR2 > newfilenameR2```
+A) Rename sequence identifiers of .fq files
 
-```for i in *.R1_f.fq; do basename=${i/.R1_f.fq}; sed 's/_1$//g' $i > ${basename}.R1.fq; done```
-```for i in *.R2_f.fq; do basename=${i/.R2_f.fq}; sed 's/_2$//g' $i > ${basename}.R2.fq; done```
+During process.radtags, stacks renamed R1 and R2 sequence identifiers to _1 and _2. When running bwa mem it expects same file names or an error will appear:
+[mem_sam_pe] paired reads have different names:
+"5_1202_2403_86748_1", "5_1202_2403_86748_2"
 
-OR (as I have encountered problems with above commandline:
+Just cut of the _1 and _2 from the identifiers
+
+```
+sed 's/_1$//g' filenameR1 > newfilenameR1
+sed 's/_2$//g' filenameR2 > newfilenameR2
+for i in *.R1_f.fq; do basename=${i/.R1_f.fq}; sed 's/_1$//g' $i > ${basename}.R1.fq; done
+for i in *.R2_f.fq; do basename=${i/.R2_f.fq}; sed 's/_2$//g' $i > ${basename}.R2.fq; done
+```
+
+**OR** (as I have encountered problems with above commandline:
 
 ```
 ls -laht | awk '{print $NF}' | grep 'R1’ | sort | uniq > list_allR1
@@ -28,80 +37,56 @@ while read i; do sed  ’s/_1$//g' $i > ${i}_s; done < list_allR1
 while read i; do sed  's/_2$//g' $i > ${i}_s; done < list_allR2
 ```
 
-Copy *fq_s to align folder
+Get all this to the align directory and rename the files
 
 ```
+cp *fq_s ../align
 rename .fq_s .fq *fq_s
 ```
 
-B) (optional) In case of fragmented reference, it is better to make a pseudo-scaffold. This is 
-a concatenated file with all the contigs togethers, separated with 30 A's.
-perl ~/scripts/scaffolds.pl soaprunk61.contig
-output files are soaprunk61.contig.pseudo  & scaffold_order.soaprunk61.contig
-REMEMBER to translate the SNP table back later to the original genome locations
- with scaffold2contig.v2.pl
+---
 
-C) GATK is not able to handle N's, count and replace these with A's
-Count number of N’s in the file as GATK can’t handle N’s
-note: whenever counting lines make sure to account for header lines.
-Use grep -v '>'  first bascially because you don’t want to count characters in the
-header and you should never ever assume the header won't contain some chars.
-grep -v is "inverse grep": that is "look for lines without this"
-But without accounting for this:
+B) Run bwa
 
-**Option1** (—> gives string of A’s and counts the characters)
-tr -cd N < soaprunk61.contig.pseudo | wc -c 
- 
-*OR*
+This step includes conversion from .sam to .bam and sorting. Downstream we use steps and calling files without the "paired_" prefix, so this has to be removed from the files. Also, we want to lose the 'pl' from the names and call them 1-* instead of pl1-*...
 
-**Option2**(—> slower option, gives char in lines and then counts the number of lines.
- wc -c won’t work here as there will be twice as many characters, A and newline)
-```fgrep -o N soaprunk61.contig.pseudo | wc -l```
-
-In case of N's replace with A's with sed, not done here as wasn't necessary
-
-can also be used to see how many A's were added in the scaffolds.pl script
-by counting the difference between soaprunk61.contig and soaprunk61.contig.pseudo
-```echo '712102436 - 421159706' | bc```
-
-D) Index .contig (or in case of B, contig.pseudo) file for samtools, bwa and gatk
-
-Check maximum line lengths in file with:
-```awk '{ if (x < length()) x = length() } END { print x }' <referencegenome>```
-Check for anything shorter that this maximum length (here 70)
-```awk 'length($0) < 70' <referencegenome>```
-In case not all lines are same length:
-
-Delete white lines
-```sed '/^$/d' <filename> > <newfilename>```
-
--a specifies the indexing algorithm bwa uses. There is another option (IS), for smaller
-genomes (<2GB), check bwa man page
-```bwa index -a bwtsw <referencegenome>```
-
-```samtools faidx <referencegenome>```
-
-Note by Kay (SNP calling blog): if you want to use Picard downstream use the -M option in bwa. This is NOT
-implemented in below script! From bwa man: Mark shorter split hits as secondary
-
-
-E) Run bwa (in align folder) 
-this includes conversion from .sam to .bam and sorting
-The listreadgroups list used later is without the "paired_" prefix, so this has to be
-removed from the files. Also, this list has 1.* instead of pl1-* etc
-```for f in paired_pl*; do mv "$f" "${f#paired_pl}"; done```
-```rename pl1- 1- pl1-*```
+```
+for f in paired_pl*; do mv "$f" "${f#paired_pl}"; done
+rename pl1- 1- pl1-*
+```
 
 etc
 
-Make a list with the just the basenames (cut off last 6 characters)
-```ls -laht | awk '{print $NF}' | grep '.fq$' | sed 's/\(.*\)....../\1/' | sort | uniq > list_sample```
+Make a list with the just the basenames (cut off last 6 characters, the .R1.fq and .R2.fq)
+```
+ls -laht | awk '{print $NF}' | grep '.fq$' | sed 's/\(.*\)....../\1/' | sort | uniq > list_sample
+```
+
+Load required modules
 
 ```
-#excluded from script
-#while read i; do sh ~/scripts/SNP_calling/bwa_cra_lotte.sh $i; done < list_sample
-#The following is implemented in bwapseudo.job in align directory:
-#while read i; do sh ~/scripts/SNP_calling/bwa_cra_pseudo.sh $i; done < list_sample
+module load bwa
+module load samtools
+```
+
+```
+#bwa alignment script
+#!/bin/bash
+REF=/nfs/home/hpcsci/lotteanv/ragweed/WGS/soap_assembly/soaprunk61.contig.pseudo
+SAM_INDEX=/nfs/home/hpcsci/lotteanv/ragweed/WGS/soap_assembly/soaprunk61.contig.pseudo.fai
+OUT_PATH=/nfs/home/hpcsci/lotteanv/ragweed/GBS/raw_common/output_all/bwa_genome
+#align to indexed database -t=threads -M=important for Picard -I = Illumina 1.3+ -q is quality trimming
+bwa mem -t 2 -M $REF $1\.R1_tfq20.fq $1\.R2_tfq20.fq > $OUT_PATH/$1_tfq20.sam
+#sam to bam conversion
+samtools view -u -t  $SAM_INDEX -S $OUT_PATH/$1_tfq20.sam -o $OUT_PATH/$1_tfq20.bam
+samtools sort $OUT_PATH/$1_tfq20.bam $OUT_PATH/$1_tfq20.sort
+samtools index $OUT_PATH/$1_tfq20.sort.bam
+```
+
+And call the script with
+
+```
+while read i; do sh ~/scripts/SNP_calling/bwa_cra_lotte.sh $i; done < list_sample
 ```
 
 Example output:
@@ -124,15 +109,6 @@ Example output:
 
 This should be run in parallel and an example job is found in bwajob.job (align dir)
 
-To go through conversion of sam to bam as one-liners (this is however implemented in
-bwa_cra_pseudo.sh script, not in bwa_cra_lotte.sh script):
-
-```
-#excluded from script
-#for i in *.sam; do basename=${i/.sam};  samtools view -u -t  $SAM_INDEX  -S ${basename}.sam -o ${basename}.bam; done
-#for i in *.bam; do basename=${i/.bam}; samtools sort ${basename}.bam ${basename}.sort; done
-#for i in *sort.bam; do basename=${i/.sort.bam}; samtools index ${basename}.sort.bam; done
-```
 
 Check number of mapped and unmapped reads
 the file produced will show the number of mapped reads, unmapped reads reads where
