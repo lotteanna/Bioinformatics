@@ -26,7 +26,7 @@ awk 'NR!=1{print $1}' snptableUG.tab.table.contig.random | wc -l
 B)
 Convert the SNPtable to a STRUCTURE readable format
 
-NOTE: the order of the digital numbers is mixed up (eg AC can now be read in by Structure as CA. This means linkage mapping is impossible with this data (see Structure documentation). This is caused by the coding used initially, which is by vcf2vertical_dep_GATK_UG.pl
+ NOTE: the order of the digital numbers is mixed up (eg AC can now be read in by Structure as CA. This means linkage mapping is impossible with this data (see Structure documentation). This is caused by the coding used initially, which is by vcf2vertical_dep_GATK_UG.pl
 
 First, make a population document (popind) for the conversion script, which is a tab separated file. The following seems to work (don't enter the headers):
 pop        sampleID
@@ -361,17 +361,17 @@ maxRep=$1
 
 for i in $(eval echo "{1..$2}")
 do
-task_id=$i
-echo "This is task number $task_id\n"
-K=$[1+($task_id/$maxRep)]`
-rep=$[($K*$maxRep)-$task_id]
-out=`echo output_K"$K"_r"$rep"`
-chain=`echo chain_K"$K"_r"$rep"`
-seed=`eval od -vAn -N4 -tu4 < /dev/urandom`
-structure -K $K -o $out -D $seed > $chain
-END=$(date +%s)
-DIFF=$(echo "$END - $START" | bc)
-echo "Finished job K=$K, replicate=$rep, and took $DIFF seconds. It had seed $seed" >> log
+    task_id=$i
+    echo "This is task number $task_id\n"
+    K=$[1+($task_id/$maxRep)]`
+    rep=$[($K*$maxRep)-$task_id]
+    out=`echo output_K"$K"_r"$rep"`
+    chain=`echo chain_K"$K"_r"$rep"`
+    seed=`eval od -vAn -N4 -tu4 < /dev/urandom`
+    structure -K $K -o $out -D $seed > $chain
+    END=$(date +%s)
+    DIFF=$(echo "$END - $START" | bc)
+    echo "Finished job K=$K, replicate=$rep, and took $DIFF seconds. It had seed $seed" >> log
 done
 
 ```
@@ -538,10 +538,7 @@ CLUMPP paramfile #mcc version
 I)
 Running Distruct
 Rename the .output files from CLUMPP to .indivq and .popq for the indivual and population run respectively
-
-```
 module load distrust
 distructLinux1.1
 ps K2.ps
-```
 

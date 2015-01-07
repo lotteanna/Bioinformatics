@@ -31,9 +31,9 @@ for i in *.R2_f.fq; do basename=${i/.R2_f.fq}; sed 's/_2$//g' $i > ${basename}.R
 **OR** (as I have encountered problems with above commandline:
 
 ```
-ls -laht | awk '{print $NF}' | grep 'R1’ | sort | uniq > list_allR1
+ls -laht | awk '{print $NF}' | grep 'R1' | sort | uniq > list_allR1
 ls -laht | awk '{print $NF}' | grep 'R2' | sort | uniq > list_allR2
-while read i; do sed  ’s/_1$//g' $i > ${i}_s; done < list_allR1
+while read i; do sed  's/_1$//g' $i > ${i}_s; done < list_allR1
 while read i; do sed  's/_2$//g' $i > ${i}_s; done < list_allR2
 ```
 

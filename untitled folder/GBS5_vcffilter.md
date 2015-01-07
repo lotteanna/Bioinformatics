@@ -1,5 +1,5 @@
 {\rtf1\ansi\ansicpg1252\cocoartf1265\cocoasubrtf210
-{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\fonttbl\f0\fswiss\fcharset0 Helvetica;\f1\fnil\fcharset0 Menlo-Regular;}
 {\colortbl;\red255\green255\blue255;}
 \paperw11900\paperh16840\margl1440\margr1440\vieww10800\viewh8400\viewkind0
 \pard\tx566\tx1133\tx1700\tx2267\tx2834\tx3401\tx3968\tx4535\tx5102\tx5669\tx6236\tx6803\pardirnatural
@@ -82,8 +82,7 @@ Copy these files to local computer --> open new terminal but DO NOT ssh into MCC
 \
 G) Put scaffolds back into original contig positions\
 ```\
-perl /nfs/home/hpcsci/lotteanv/scripts/scaffold2contig.v3.pl snptableUG.tab.table \\\
-	~/ragweed/WGS/soap_assembly/scaffold_order.soaprunk61.contig\
+perl /nfs/home/hpcsci/lotteanv/scripts/scaffold2contig.v3.pl snptableUG.tab.table ~/ragweed/WGS/soap_assembly/scaffold_order.soaprunk61.contig\
 ```\
 \
 Check how this all went\
@@ -95,11 +94,14 @@ This will get every SNP for each unique Scaffold\
 353; this means that 35% of the arbitrary scaffolds made contain SNPs\
 \
 After putting back to original contigs\
+\
 ```\
 awk 'NR!=1\{print $1\}' snptableUG.tab.table.contig | sort | uniq -c | wc -l\
 ```\
+NOTE: this is wrong coding! Printing this 
+\f1\fs22 \CocoaLigature0 will give the unique number of Chrom, whereas I need a combination of Chrom and Pos
+\f0\fs24 \CocoaLigature1 \
 \
-5244; that is possible as the Scaffolds were arbitrary, so it makes sense that the SNPs are on\
-more contigs than scaffolds.\
+Scaffolds were arbitrary, so it makes sense that the SNPs are on more contigs than scaffolds.\
 \
 }

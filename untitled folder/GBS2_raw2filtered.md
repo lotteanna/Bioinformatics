@@ -128,35 +128,35 @@ my $read1 = ();
 my $qual1 = ();
 my $badreadno1 =0;
 while (<FQ1>) {
-my $line1 = $_;
-chomp $line1;
-if($i==0){
-if($line1=~m/^\@/){
-$header1=$line1;
-$i=1;
-}elsif($line1=~m/^\+$/){
-$i=2;
-}
-}elsif($i==1){
-$read1=$line1;
-$i=0;
-}elsif($i==2){
-$qual1=$line1;
-$i=0;
-#remove forward adapter contamination whole or parts
-if($read1=~m/CTGCAAGATCGGAAGAGCGGTTCAGCAGGAATGCCGAG/ || $read1=~m/CTGCAAGATCGGAAGAGCG/ || $read1=~m/CGGTTCAGCAGGAATGCCGAG/ || $read1=~m/AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT/ || $read1=~m/AGATCGGAAGAGCGTCGTGT/ || $read1=~m/AGGGAAAGAGTGT/){
-$badreadno1 = $badreadno1 +1;
-}else{
-print FQ1_clean "$header1\n$read1\n+\n$qual1\n";
-}
-}
+    my $line1 = $_;
+    chomp $line1;
+        if($i==0){
+                if($line1=~m/^\@/){
+                        $header1=$line1;
+                        $i=1;
+                }elsif($line1=~m/^\+$/){
+                        $i=2;
+                }
+        }elsif($i==1){
+                $read1=$line1;
+                $i=0;
+        }elsif($i==2){
+                $qual1=$line1;
+                $i=0;
+                #remove forward adapter contamination whole or parts
+                if($read1=~m/CTGCAAGATCGGAAGAGCGGTTCAGCAGGAATGCCGAG/ || $read1=~m/CTGCAAGATCGGAAGAGCG/ || $read1=~m/CGGTTCAGCAGGAATGCCGAG/ || $read1=~m/AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT/ || $read1=~m/AGATCGGAAGAGCGTCGTGT/ || $read1=~m/AGGGAAAGAGTGT/){
+                        $badreadno1 = $badreadno1 +1;
+                }else{
+                        print FQ1_clean "$header1\n$read1\n+\n$qual1\n";
+                }
+        }
 
 }
 close FQ1_clean;
 close FQ1;
 print "The number of reads with adapter contamination is $badreadno1\n";
 ```
-
+                                                                                
 Call the script
 
 ```
