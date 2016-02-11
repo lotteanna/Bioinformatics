@@ -7,7 +7,10 @@ module load samtools
 module load bwa
 ```
 
-** A) Turn fragmented reference genome into pseudo-scaffold **
+Good websites
+http://gatkforums.broadinstitute.org/gatk/discussion/1601/how-can-i-prepare-a-fasta-file-to-use-as-reference
+
+** Optional) Turn fragmented reference genome into pseudo-scaffold **
 In case of fragmented reference, it is better to make a pseudo-scaffold. This is 
 a concatenated file with all the contigs togethers, separated with 30 A's.
 ```
@@ -19,7 +22,7 @@ output files are soaprunk61.contig.pseudo  & scaffold_order.soaprunk61.contig
 REMEMBER to translate the SNP table back later to the original genome locations
  with scaffold2contig.v2.pl
 
-**B) Replace N's for A's**
+**A) Replace N's for A's**
 GATK is not able to handle N's, count and replace these with A's
 Count number of N’s in the file as GATK can’t handle N’s
 note: whenever counting lines make sure to account for header lines.
@@ -59,8 +62,8 @@ In the reference genome there might be use of both capital and non-capital bases
 
 the “tr” functions allows for replacements
 
-**C) Index** 
-Index .contig (or in case of A, contig.pseudo) file for samtools, bwa and gatk
+**B) Index** 
+Index .contig (or in case of fragmented reference, contig.pseudo) file for samtools, bwa and gatk
 
 Check maximum line lengths in file with:
 ```
@@ -98,7 +101,7 @@ samtools faidx <referencegenome>
 
 *For PICARD*
 ```
-java -jar $PICARD/CreateSequenceDictionary.jar REFERENCE=<refgenome>.fa OUTPUT=<refgenome>.dict
+java -jar $PICARD/CreateSequenceDictionary.jar REFERENCE=<refgenome> OUTPUT=<refgenome>.dict
 ```
 
 
