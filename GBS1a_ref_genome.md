@@ -1,5 +1,7 @@
-Reducing size of fragmented reference genome
+Preparing reference genome for downstream programs. Also includes a guide on what to do with a highly fragmented reference genome!
 ===
+
+
 
 Load required packages
 ```
@@ -7,8 +9,11 @@ module load samtools
 module load bwa
 ```
 
-Good websites
+Link(s):
+
 http://gatkforums.broadinstitute.org/gatk/discussion/1601/how-can-i-prepare-a-fasta-file-to-use-as-reference
+
+---
 
 ** Optional) Turn fragmented reference genome into pseudo-scaffold **
 In case of fragmented reference, it is better to make a pseudo-scaffold. This is 
@@ -22,7 +27,10 @@ output files are soaprunk61.contig.pseudo  & scaffold_order.soaprunk61.contig
 REMEMBER to translate the SNP table back later to the original genome locations
  with scaffold2contig.v2.pl
 
+---
+
 **A) Replace N's for A's**
+
 GATK is not able to handle N's, count and replace these with A's
 Count number of N’s in the file as GATK can’t handle N’s
 note: whenever counting lines make sure to account for header lines.
@@ -47,8 +55,9 @@ grep -v '>'| tr -cd N < ragweed_17Aug2015_2ABsE.fasta | wc -c
 
 *OR*
 
-**Option2**(—> slower option, gives char in lines and then counts the number of lines.
- wc -c won’t work here as there will be twice as many characters, A and newline)
+**Option2**  —> slower option, gives char in lines and then counts the number of lines.
+ wc -c won’t work here as there will be twice as many characters, A and newline
+
 ```fgrep -o N soaprunk61.contig.pseudo | wc -l```
 
 In case of N's replace with A's with sed:
@@ -62,7 +71,10 @@ In the reference genome there might be use of both capital and non-capital bases
 
 the “tr” functions allows for replacements
 
+---
+
 **B) Index** 
+
 Index .contig (or in case of fragmented reference, contig.pseudo) file for samtools, bwa and gatk
 
 Check maximum line lengths in file with:
@@ -83,8 +95,8 @@ Delete white lines
 Otherwise samtools won't be able to index the reference genome and will give the error:
  [fai_build_core] different line length in sequence <Scaffold#>
 
----
-Indexing
+
+Program specific index code:
 
 *For bwa*
 -a specifies the indexing algorithm bwa uses. There is another option (IS), for smaller
