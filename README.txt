@@ -1,8 +1,10 @@
-- GBS_raw2filtered: raw paired end GBS reads to alignment ready files;
-- GBS_bwa: Align filtered paired end GBS reads with fragmented reference genome
-- GBS_gatk: Indel realignment, Calling SNPs and Genotypes using UG and HaplotypeCaller
-- GBS_vcffilter: filtering vcf files with custom perl scripts
-- GBS_STRUCTURE: transforming custom SNP and genotype tables to STRUCTURE and running the program
+- GBS1a_ref_genome.md: how to get started with your (possibly highly fragmented) reference genome
+- GBS1b_Stacks_notcomplete.md: Darn, no reference genome available. We can also build one *de novo*
+- GBS2_raw2filtered: raw paired end GBS reads to alignment ready files;
+- GBS3_bwa: Align filtered paired end GBS reads with fragmented reference genome
+- GBS4_gatk: Indel realignment, Calling SNPs and Genotypes using UG and HaplotypeCaller
+- GBS5_vcffilter: filtering vcf files with custom perl scripts
+- GBS6_STRUCTURE: transforming custom SNP and genotype tables to STRUCTURE and running the program
 - GBS_BayEnv
 - GBS_LFMM
 - GBS_Stacks: de novo assembly of paired end GBS reads
