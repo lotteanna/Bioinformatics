@@ -11,4 +11,3 @@ Yup, this all might seem super simple. Unfortunately, not all of us are hardcore
 - GBS_LFMM
 - GBS_Stacks: de novo assembly of paired end GBS reads
 
-Please be kind and contact me before distributing some of the more advanced coding used in these walkthroughs. 
