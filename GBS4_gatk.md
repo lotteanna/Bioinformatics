@@ -79,6 +79,8 @@ C) Base recallibration (look at bwa_red_gatk2.sh, started writing in gatk_cra2.s
  this step is only possible after a preliminary run that identifies SNPs and creates a vcf file
 
 D) SNP and genotype calling with UnifiedGenotyper
+UG is the main tool to get genetic variance. Most of the time, real mutations are hidden in the noise; need analysis tools to determine if variation is genetic variance of random machine noise. UG is Bayesian and calls SNPs and indels seperatly by considering each variation independently and assigns a genotype to a sample when the variant is called.
+
 Make a list of all the realigned bam files to be the input file for the unified genotyper
 
 ```

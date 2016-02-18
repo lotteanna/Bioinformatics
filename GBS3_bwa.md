@@ -40,7 +40,7 @@ while read i; do sed  's/_2$//g' $i > ${i}_s; done < list_allR2
 Get all this to the align directory and rename the files
 
 ```
-cp *fq_s ../align
+mv *fq_s ../align
 rename .fq_s .fq *fq_s
 ```
 
@@ -52,10 +52,8 @@ This step includes conversion from .sam to .bam and sorting. Downstream we use s
 
 ```
 for f in paired_pl*; do mv "$f" "${f#paired_pl}"; done
-rename pl1- 1- pl1-*
 ```
 
-etc
 
 Make a list with the just the basenames (cut off last 6 characters, the .R1.fq and .R2.fq)
 ```
