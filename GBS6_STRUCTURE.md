@@ -50,155 +50,7 @@ This table doesn't neatly have the genotypes spelled out as AA, AT, GC etc, but 
 - Transpose columns and put them in the right order for STRUCTURE
 - Optional: Write data for each individual in 2 rows (ONEROWPERIND=0 if divided in 2 rows)
 
-
--------
-Run the conversion script in Perl (R script is below):
-```
-#########################################################################
-# SNPtable2structure_combined_lotte                                     #
-#                                                                       #
-# when including location information run as:                           #
-# perl bin/SNPtable2structure.pl data/rand.snptable \                   #
-# results/rand.structure data/names2pop                                 #
-# when not including location information run as:                       #
-# perl bin/SNPtable2structure.pl data/rand.snptable \                   #
-# results/rand.structure                                                #
-#                                                                       #
-# This script converts custom SNP tables to STRUCTURE format            #
-# Current version allows for 2 SNPlocation information columns          #
-# last version: transcript contig, genomic contig and genomic position  #
-# current version: genomic contig and genomic position                  #
-# editted by Lotte van Boheemen                                         #
-# last edit 4-12-14                                                     #
-#########################################################################
-
-#!/usr/bin/perl
-
-use diagnostics;
-use warnings;
-use strict;
-
-my $in = $ARGV[0];
-my $pop = $ARGV[2]; #tab sep pop \t ind
-my $out = $ARGV[1];
-my %pop;
-my %snp_to_dig;
-$snp_to_dig{"A"}='1	1'; #so this is calling the keys and values in hash %snp_to_dig. Key A has value '1	1' etc.
-$snp_to_dig{"T"}='2	2';
-$snp_to_dig{"C"}='3	3';
-$snp_to_dig{"G"}='4	4';
-$snp_to_dig{"N"}='-9	-9';
-$snp_to_dig{"K"}='2	4';
-$snp_to_dig{"R"}='1	4';
-$snp_to_dig{"W"}='1	2';
-$snp_to_dig{"M"}='1	3';
-$snp_to_dig{"S"}='3	4';
-$snp_to_dig{"Y"}='2	3';
-$snp_to_dig{"-"}='-9	-9';
-
-my $c=1;
-my %h;
-my %samples;
-my @samples;
-my @loc;
-my %label;
-my $cn=1;
-open POP, $pop; #this will open the population file (ARGV[2])
-while (<POP>){
-chomp;
-my @a = split;	#this will split each line of the pop file and turns it into an array @a, $a[0] is first column in pop file, $a[1] is 2nd
-$pop{$cn}=$a[1]; #calls key "1" in %pop the same as 2nd column of pop file, in this case individual
-$label{$cn}=$a[0]; #calls key "1" in %label the same as 1st column of pop file
-$cn++; #adds 1 to cn, so calls key 1,2,3 etc
-}
-
-close POP;
-
-foreach my $i (keys %pop){
-print "$i $pop{$i} \n";
-}
-
-open IN, $in;
-
-#foreach (keys %snp_to_dig){
-#	print "keys $_ $snp_to_dig{$_}\n";
-#} # this would print off all the keys with their values in %snp_to_dig
-
-while (<IN>){
-chomp;
-my @a = split; #@a is the infile, with each item seperated by the command 'split'
-if(/^#/){ #skip any header, in this case CHROM POS <sampleIDs>
-next;
-}
-my @tmp=();
-my $loc=shift (@a); #$loc is CHROM
-my $loc2=shift(@a); #$loc2 is POS
-push(@tmp, $loc, $loc2); #@tmp holds name with genomic contig and genomic position
-my $tmp=join '__', @tmp; #$tmp now holds CHROM__POS
-push(@loc, $tmp);
-my $ind=1;
-foreach my $i (@a){#@a on this point only holds genotype info
-print "$snp_to_dig{$i}\n";
-push(@{$samples{$ind}}, $snp_to_dig{$i});
-#the value of each key (ind, 1 to n) in %samples is $snp_to_dig{$i}.
-# $snp_to_dig{i} is each  genotype encountered in the infile.
-#So looping through @a, when encountering for example  A, this part will be '1	1'.
-$ind=$ind+1;
-}
-
-}
-close IN;
-open OUT, ">$out";
-
-print  OUT "label\tpopulation\t";
-
-foreach (@loc){#print all the previous called CHROM__POS to the outfile
-print OUT "$_\t"; #print out each locus after label\tpopulation (seperated by tabs)
-}
-print OUT "\n";#and go to next line
-
-#this assumes each individual is sorted in the same way in the input file as in the popfile.
-foreach my $s (sort keys %samples){
-if ($pop){
-if ($pop{$s}){
-print OUT "$label{$s}\t$pop{$s}\t";
-foreach (@{$samples{$s}}){
-print "pop $s\n";
-print OUT  "$_\t";
-}
-print OUT "\n";
-}
-}else{
-print OUT "$label{$s}\t";
-foreach my $t (@{$samples{$s}}){
-print OUT "$t\t";
-}
-print OUT "\n";
-}
-}
-```
-
-In command line:
-```
-perl ~/scripts/SNPtable2structure_combined_lotte.pl snptableUG.tab.192.table.contig.random rand.structure popind
-```
-
-It prints out the rand.structure table with per line the following:
-popID \t sampleID \t \t Chrom_pos1 \t Chrom_pos2 etc.
-
-I am pretty sure that the script assumes that the individuals in the popind file are sorted in the same way as the header of snptableUG.tab.192.table.contig.random.
-Also, this script prints out
-
-
-```
-cat rand.structure | wc -l 
-```
-
-shows that it didn't produce 2 lines per individual...
-
-
--------------------
-
+--- 
 
 Use R script written by Anders Gonçalves da Silva (2014):
 
@@ -541,4 +393,162 @@ Rename the .output files from CLUMPP to .indivq and .popq for the indivual and p
 module load distrust
 distructLinux1.1
 ps K2.ps
+
+
+
+===
+
+
+
+Other option for STRUCTURE reformat that I didn't get to work
+
+-------
+Run the conversion script in Perl (R script is below):
+```
+#########################################################################
+# SNPtable2structure_combined_lotte                                     #
+#                                                                       #
+# when including location information run as:                           #
+# perl bin/SNPtable2structure.pl data/rand.snptable \                   #
+# results/rand.structure data/names2pop                                 #
+# when not including location information run as:                       #
+# perl bin/SNPtable2structure.pl data/rand.snptable \                   #
+# results/rand.structure                                                #
+#                                                                       #
+# This script converts custom SNP tables to STRUCTURE format            #
+# Current version allows for 2 SNPlocation information columns          #
+# last version: transcript contig, genomic contig and genomic position  #
+# current version: genomic contig and genomic position                  #
+# editted by Lotte van Boheemen                                         #
+# last edit 4-12-14                                                     #
+#########################################################################
+
+#!/usr/bin/perl
+
+use diagnostics;
+use warnings;
+use strict;
+
+my $in = $ARGV[0];
+my $pop = $ARGV[2]; #tab sep pop \t ind
+my $out = $ARGV[1];
+my %pop;
+my %snp_to_dig;
+$snp_to_dig{"A"}='1	1'; #so this is calling the keys and values in hash %snp_to_dig. Key A has value '1	1' etc.
+$snp_to_dig{"T"}='2	2';
+$snp_to_dig{"C"}='3	3';
+$snp_to_dig{"G"}='4	4';
+$snp_to_dig{"N"}='-9	-9';
+$snp_to_dig{"K"}='2	4';
+$snp_to_dig{"R"}='1	4';
+$snp_to_dig{"W"}='1	2';
+$snp_to_dig{"M"}='1	3';
+$snp_to_dig{"S"}='3	4';
+$snp_to_dig{"Y"}='2	3';
+$snp_to_dig{"-"}='-9	-9';
+
+my $c=1;
+my %h;
+my %samples;
+my @samples;
+my @loc;
+my %label;
+my $cn=1;
+open POP, $pop; #this will open the population file (ARGV[2])
+while (<POP>){
+chomp;
+my @a = split;	#this will split each line of the pop file and turns it into an array @a, $a[0] is first column in pop file, $a[1] is 2nd
+$pop{$cn}=$a[1]; #calls key "1" in %pop the same as 2nd column of pop file, in this case individual
+$label{$cn}=$a[0]; #calls key "1" in %label the same as 1st column of pop file
+$cn++; #adds 1 to cn, so calls key 1,2,3 etc
+}
+
+close POP;
+
+foreach my $i (keys %pop){
+print "$i $pop{$i} \n";
+}
+
+open IN, $in;
+
+#foreach (keys %snp_to_dig){
+#	print "keys $_ $snp_to_dig{$_}\n";
+#} # this would print off all the keys with their values in %snp_to_dig
+
+while (<IN>){
+chomp;
+my @a = split; #@a is the infile, with each item seperated by the command 'split'
+if(/^#/){ #skip any header, in this case CHROM POS <sampleIDs>
+next;
+}
+my @tmp=();
+my $loc=shift (@a); #$loc is CHROM
+my $loc2=shift(@a); #$loc2 is POS
+push(@tmp, $loc, $loc2); #@tmp holds name with genomic contig and genomic position
+my $tmp=join '__', @tmp; #$tmp now holds CHROM__POS
+push(@loc, $tmp);
+my $ind=1;
+foreach my $i (@a){#@a on this point only holds genotype info
+print "$snp_to_dig{$i}\n";
+push(@{$samples{$ind}}, $snp_to_dig{$i});
+#the value of each key (ind, 1 to n) in %samples is $snp_to_dig{$i}.
+# $snp_to_dig{i} is each  genotype encountered in the infile.
+#So looping through @a, when encountering for example  A, this part will be '1	1'.
+$ind=$ind+1;
+}
+
+}
+close IN;
+open OUT, ">$out";
+
+print  OUT "label\tpopulation\t";
+
+foreach (@loc){#print all the previous called CHROM__POS to the outfile
+print OUT "$_\t"; #print out each locus after label\tpopulation (seperated by tabs)
+}
+print OUT "\n";#and go to next line
+
+#this assumes each individual is sorted in the same way in the input file as in the popfile.
+foreach my $s (sort keys %samples){
+if ($pop){
+if ($pop{$s}){
+print OUT "$label{$s}\t$pop{$s}\t";
+foreach (@{$samples{$s}}){
+print "pop $s\n";
+print OUT  "$_\t";
+}
+print OUT "\n";
+}
+}else{
+print OUT "$label{$s}\t";
+foreach my $t (@{$samples{$s}}){
+print OUT "$t\t";
+}
+print OUT "\n";
+}
+}
+```
+
+In command line:
+```
+perl ~/scripts/SNPtable2structure_combined_lotte.pl snptableUG.tab.192.table.contig.random rand.structure popind
+```
+
+It prints out the rand.structure table with per line the following:
+popID \t sampleID \t \t Chrom_pos1 \t Chrom_pos2 etc.
+
+I am pretty sure that the script assumes that the individuals in the popind file are sorted in the same way as the header of snptableUG.tab.192.table.contig.random.
+Also, this script prints out
+
+
+```
+cat rand.structure | wc -l 
+```
+
+shows that it didn't produce 2 lines per individual...
+
+
+-------------------
+
+
 
