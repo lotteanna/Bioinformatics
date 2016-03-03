@@ -50,12 +50,20 @@ This table doesn't neatly have the genotypes spelled out as AA, AT, GC etc, but 
 - Transpose columns and put them in the right order for STRUCTURE
 - Optional: Write data for each individual in 2 rows (ONEROWPERIND=0 if divided in 2 rows)
 
---- 
 
-Use R script written by Anders Gonçalves da Silva (2014):
+
+Use R script 
 
 ```
 ### SNPTable2STR
+
+### History
+#7/Jan/2015 - fixed bug found by Lotte where if the first individual was found to be missing
+## then the script would crash. The issue was that when that happened, the outputGenos object
+## was not created when i == 1 in the loop, so when the i > 1 came around, the ifelse statement
+## test would lead to FALSE, and it would expect the outputGenos object to exist. The ifelse
+## statment has now chaned to test if the object outputGenos does not exist. If it doesn't
+## then it creates it.
 
 #### Auxiliary functions #####
 
@@ -153,7 +161,7 @@ next
 nInd = nInd + 1
 
 strGeno=paste0(paste(paste(ind,pop,sep="\t"),apply(recodedGenotypes,1,paste,collapse="\t")),collapse="\n")
-outputGenos=ifelse(i==1,strGeno,paste(outputGenos,strGeno,sep="\n"))
+outputGenos=ifelse(!exists("outputGenos"),strGeno,paste(outputGenos,strGeno,sep="\n"))
 }
 
 #save genotypes to file
@@ -202,6 +210,7 @@ http://pritchardlab.stanford.edu/structure_software/release_versions/v2.3.4/stru
 D)
 Great! Now start some runs, preferably in parallel. Ideally, we want to work our way up the ultimate number of iterations and long burnin times, but start with some subsamples and small runs to evaluate the data.
 
+Option 1:
 ```
 #!/bin/sh
 
@@ -231,14 +240,45 @@ done
 Run this on the command line using
 bash par_struc.sh <max number of repetitions> <max number of tasks>
 
-OR (much better option)
+OR Option 2 (much better option)
 
-log a job to run it parallel.
+log a job to run it parallel:
+`
+#!/bin/sh
+#$ -S /bin/sh
+#$ -l h_rt=24:00:00
+#$ -cwd
+#$ -M XXXX@monash.edu
+#$ -m beas
+#$ -cwd
+task_id=$[$SGE_TASK_ID-1]
 
+K=$[1+($task_id/$maxRep)]
+
+rep=$[($K*$maxRep)-$task_id]
+
+out=`echo output_K"$K"_r"$rep"`
+
+seed=`eval od -vAn -N4 -tu4 < /dev/urandom`
+
+echo $task_id
+echo $total_tasks
+echo $K
+echo $rep
+echo $out
+echo $seed
+
+module load structure/2.3.4
+
+structure -K $K -o $out -D $seed
+```
+
+qsub -v maxRep=10 -V -t 1-100 struc.job
 
 E)
 
-Output from STRUCTURE cannot be used in R, needs to be parsed by using the python script parse_struc.py
+Output from STRUCTURE cannot be used in R, needs to be parsed.
+When using *option1* in *D*, use the python script parse_struc.py
 
 ```
 #!/usr/bin/env python
@@ -321,9 +361,41 @@ python ~/scripts/parse_struc.py chain_K1_ #(etc, for every K)
 
 This will create a *sum.txt file for every K
 
+Option 2:
+struc_parse.sh:
+```
+#!/bin/sh
+
+search=$1
+out=chains_$search.txt
+
+echo "Searching for $search..."
+
+files=`find . -name "struc.job.o*" -exec grep -l "$search" {} \;`
+
+n=1
+
+for f in $files
+do
+if [ "$n" -eq "1" ]
+then
+grep -m1 "Rep" $f | sed 's/#://g ; s/[\s^\S\n]/\t/g' >$out
+fi
+sed -n '/BURNIN/,/MCMC complete/{ s/://g; s/[\s^\S\n]/\t/g; /^[0-9]/p}' <$f >>$out      
+n=$(($n + 1))
+done
+```
+
+bash struc_parse.sh K2 
+Note: be careful when parsing K1, it will also parse K2, so better type K1_ and change name of output file
+
+This will producee chains_K2.txt etc
+
 F)
 Run structureHarvester.py on structure outputs
 http://users.soe.ucsc.edu/~dearl/software/structureHarvester/
+
+Make sure to also place harvesterCore.py in the same directory as structureHarvester.py
 
 ```
 python structureHarvester.py --dir=structure_output --out=clumpp_files --evanno --clumpp
@@ -394,16 +466,13 @@ module load distrust
 distructLinux1.1
 ps K2.ps
 
+By ordering the labels in K*.names and K*.languages, you can change the order in the plot.
+By setting PRINT_INDIVS to 1, you print the q-scores per individual. Setting this to 0 will print the q-scores per population
+In K*perm, it is possible to specify the colours. The first colour in the list will be drawn first in the bar (bottom). The numbers in front will specify something with the q-value. It is really just messing around with these numbers to get the desired order of colours
 
-
-===
-
-
-
-Other option for STRUCTURE reformat that I didn't get to work
 
 -------
-Run the conversion script in Perl (R script is below):
+Run the conversion script in Perl (not working)
 ```
 #########################################################################
 # SNPtable2structure_combined_lotte                                     #

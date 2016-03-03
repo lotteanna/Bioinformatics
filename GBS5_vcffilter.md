@@ -1,20 +1,73 @@
 Filtering the vcf files
 ===
 
-The vcf file is beautiful, but contains some info we're not that interested in, e.g. loci with very low or high coverage, extreme heterozygosity, lot's of missing data, alleles with very low frequency etc. So we're going to filter that all out.
+Useful links
+
+```
+http://gatkforums.broadinstitute.org/gatk/discussion/2806/howto-apply-hard-filters-to-a-call-set
+https://www.broadinstitute.org/gatk/guide/article?id=3225
+```
+
+The vcf file is beautiful, but contains some info we're not that interested in, e.g. bad mapping qualities, loci with very low or high coverage, extreme heterozygosity, lot's of missing data, alleles with very low frequency etc. So we're going to filter that all out.
+
+
+**A)Retrieve only raw SNPs from vcf file**
+
+I don’t spend too much time on indels, as I am more interested in SNPs and it is uncertain in this case how reliable indels are. Below steps however, could also be followed for retrieving and filtering indels. This requires different treshholds, see Broad Institute website.
+
+```
+#gatk_selectSNP.sh
+module load java/jdk1.7.0_21
+module load gatk/3.1.1
+
+java -jar /opt/sw/gatk-3.1.1/GenomeAnalysisTK.jar \
+-T SelectVariants \
+-R ~/ragweed/GBS/raw_common/ref/ragweed_10Feb2016_2ABsE_uppercase70.fasta.fa \
+-V snps.raw.vcf \
+-selectType SNP \
+-o raw_snps.vcf
+```
+
+NOTE: I will still use grep -v 'INDELS', which will get everything BUT the indels, to make absolutely sure I don't have any indels
+
+
+**B)Filter vcf file**
+
+```
+# vcf_gatk_hardfilter.sh
+module load java/jdk1.7.0_21
+module load gatk/3.1.1
+
+java -jar /opt/sw/gatk-3.1.1/GenomeAnalysisTK.jar \
+-T VariantFiltration \
+-R /nfs/home/hpcsci/lotteanv/ragweed/GBS/raw_common/ref/ragweed_10Feb2016_2ABsE_uppercase70.fasta.fa \
+-V snps.raw.vcf \
+--filterExpression "QD < 2.0 || FS > 60.0 || MQRankSum < -12.5 || MQ < 40.0 || ReadPosRankSum < -8.0" \
+--filterName "my_snp_filter"  -o filtered_snps.vcf
+```
+
+**C)Futher filterin vcf file. Custom edition**
+
+Now we will locate called SNPs and genotypes and filters on set quality and depth it will produce an 'N' for every position (SNP/individual) for which no genotype was
+called by UG or failing the filter we set.
 
 NOTE: you are now entering in the domain of custom scripts. Although you will be working with your data more hands-on, you will also produce tables that are custom-made. This means that there are not necessarily easy format scripts to manipulate the data (as you need to do this for every-single-program)
 
+The script used is from the collection of Kay Hodgins, and the description of set thresholds originates from her blog at http://www.zoology.ubc.ca/~rieseberg/RiesebergResources/?p=25021
 
-A) filter vcf file
-this script will locate called SNPs and genotypes and filters on set quality and depth
-it will produce an 'N' for every position (SNP/individual) for which no genotype was
-called by UG
+<cite>
+qual: This is the phred-scaled probability of a SNP occurring at this site. A score of 20 means that there is a 1 in 100 chance that the SNP is a false positive. A score of 30 means that there is a 1 in 1000 chance of a false positive. There is a Qual score for each variant site.
 
-call vcf file and get all the SNPs (grep -v will get everything BUT the command)
+MQ: This is the phred-scaled probability that the read is mapped to the correct location (a low map score will occur if reads are not mapped uniquely at that site– i.e. they come from a region that is repeated in the genome). There is a MQ score for each variant site.
+
+GQ: This is the phred-scaled probability that the genotype being called is correct, given that there is a SNP at that site. There is a GQ for each individual.
+
+Minimum and maximum individual read depth: Sometimes I have found genotypes being called based on a small number of reads (e.g. 5) although the GQ is relatively high (>20). Therefore, I will likely increase the GQ threshold or also have a minimum depth requirement. Also, high depth indicates that there are repetitive regions aligning to that site so the SNP may not be real.
+</cite>
+
 
 ```
-cat snps.raw.vcf | grep -v 'INDEL' | /nfs/home/hpcsci/lotteanv/scripts/vcf2vertical_dep_GATK-UG.pl > snptableUG.tab
+cat filtered_snps.vcf | grep -v 'INDEL' | /nfs/home/hpcsci/lotteanv/scripts/vcf2vertical_dep_GATK-UG.pl > snptableUG.tab
 ```
 
 Get the number of filtered SNPs:
@@ -33,9 +86,10 @@ head(d) #R called my column V1
 hist(d$V1)
 ```
 
+**D)Filter SNPtable on population genetic parameters**
 
-B) get summary statistics and filter SNP table based on minor allele frequency,
-heterozygosity and missing data using snp_coverage.pl
+Get summary statistics and filter SNP table based on minor allele frequency, heterozygosity and missing data using snp_coverage.pl
+
 ```
 perl /nfs/home/hpcsci/lotteanv/scripts/snp_coverage.pl snptableUG.tab 
 ```
@@ -67,22 +121,50 @@ R
 d<-read.table("snptable.tab.r192.table", strip.white=T,header=T)
 head(d)
 lst<-colnames(d[,-(1:2)]) # discards the first 2 columns in the lst headers
-#countN<-sapply(lst,FUN=function(x,df)\{sum(df[,x]=="N",na.rm=T)\},df)
-#counts the total number of N\'92s for each individual
-percN<-sapply(lst,FUN=function(x,d)\{sum(d[,x]=="N",na.rm=T)\}/nrow(d),d)
-#lst<-gsub(pattern = "X",replacement = "",lst) #gets rid of all the X in the headers, don't get this to work
-#lst<-gsub("\\\\.","-",lst) #replaces the . in the sampleIDs with dashes, don't get this to work
-#calculates the percentage of N\'92s per ind divided by total number of SNPs
+```
+
+Get rid of all the X in the headers and replace the . in the sampleIDs with dashes
+
+```
+lst<-gsub(pattern = "X",replacement = "",lst) 
+lst<-gsub("\\\\.","-",lst) #doesn't work
+```
+
+Count the total number of N's for each individual
+
+```
+countN<-sapply(lst,FUN=function(x,df){sum(df[,x]=="N",na.rm=T)},df)
+```
+
+Calculate the percentage of N per SampleID divided by total number of SNPs
+
+```
+percN<-sapply(lst,FUN=function(x,d){sum(d[,x]=="N",na.rm=T)}/nrow(d),d)
+```
+
+And make a histogram
+
+```
 hist(percN)
-write.table(percN,"percN_filt192i.txt",quote=F,sep="\\t")
-#write.table(countN,"countN_filt192i.txt",quote=F,sep="\\t")
+```
+write.table(percN,"percN_filt192i.txt",quote=F,sep="\t")
+#write.table(countN,"countN_filt192i.txt",quote=F,sep="\t")
 ```
 lst<-gsub(pattern = "X",replacement = "",colnames(d[,-(1:2)]))
 
 Copy these files to local computer --> open new terminal but DO NOT ssh into MCC
 
 
-G) Put scaffolds back into original contig positions
+Check the number of SNPs gained through each method
+
+```
+cat snptableUG.tab.table | wc -l
+```
+---
+
+**OPTIONAL** only necessary when scaffolds were seperated by AAAA to reduce genome size
+
+Put scaffolds back into original contig positions
 ```
 perl /nfs/home/hpcsci/lotteanv/scripts/scaffold2contig.v3.pl snptableUG.tab.table ~/ragweed/WGS/soap_assembly/scaffold_order.soaprunk61.contig\
 ```

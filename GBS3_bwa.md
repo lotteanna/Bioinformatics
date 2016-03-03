@@ -70,9 +70,9 @@ module load samtools
 ```
 #bwa alignment script
 #!/bin/bash
-REF=/nfs/home/hpcsci/lotteanv/ragweed/WGS/soap_assembly/soaprunk61.contig.pseudo
-SAM_INDEX=/nfs/home/hpcsci/lotteanv/ragweed/WGS/soap_assembly/soaprunk61.contig.pseudo.fai
-OUT_PATH=/nfs/home/hpcsci/lotteanv/ragweed/GBS/raw_common/output_all/bwa_genome
+REF=/nfs/home/hpcsci/lotteanv/ragweed/GBS/raw_common/ref/ragweed_10Feb2016_2ABsE_uppercase70.fasta
+SAM_INDEX=/nfs/home/hpcsci/lotteanv/ragweed/GBS/raw_common/ref/ragweed_10Feb2016_2ABsE_uppercase70.fasta.fai
+OUT_PATH=/nfs/home/hpcsci/lotteanv/ragweed/GBS/raw_common/output_all/bwa_genome_12567
 #align to indexed database -t=threads -M=important for Picard -I = Illumina 1.3+ -q is quality trimming
 bwa mem -t 2 -M $REF $1\.R1_tfq20.fq $1\.R2_tfq20.fq > $OUT_PATH/$1_tfq20.sam
 #sam to bam conversion
