@@ -1,30 +1,40 @@
-===
-Task 4: Prepare the SNP-tables for the different programs
-
 **STRUCTURE**
+===
+
 http://pritchardlab.stanford.edu/structure.html
 
-A)
+**A)    Prepare a table with randomly selected unlinked SNPs for STRUCTURE**
 
-STRUCTURE can't deal with linked loci, so need to select at random one SNP per contig
+Previously I've worked with a script that randomely selects one locus per contig. However, some contigs might be small, and we don't want those to have an equal chance of being represented in our database. It would be better to first find SNPs at random (need to specify a maximum), and then make sure they are unlinked by only selecting unique contigs. For this we will use the file with most stringent filtering (50% of more missing data per SNP is filtered out), as we are only interested in population structure. Both STRUCTURE and Bayenv aren't able to '
 
-```
-perl /nfs/home/hpcsci/lotteanv/scripts/random_one_per_locus_combined_lotte.pl snptableUG.tab.table.contig
-```
 
-Check if number of selected contigs is the same as number of unique contigs
+Below command will shuffle the table and pick the top 2000 lines from the shuffled table (excluding the header, which starts with '#'. This is then passed on to the output.
 
 ```
-awk 'NR!=1{print $1}' snptableUG.tab.table.contig | sort | uniq -c | wc -l
+module load coreutils
+shuf -n 1000 snptableUG_pass.tab.p240_table | grep -v '#'  > snptableUG_pass.tab.p240.random
+```
+STRUCTURE can't deal with linked loci, so need to select at random one SNP per contig. 
+
+```
+perl /nfs/home/hpcsci/lotteanv/scripts/random_one_per_locus_combined_lotte.pl snptableUG_pass.tab.p240.random
 ```
 
-5244
+This command isn't useful when there are many contigs, as the chances are very high that previous code already selected unique contigs (just by chance). This can be checked by counting the number of lines of both files
+
 ```
-awk 'NR!=1{print $1}' snptableUG.tab.table.contig.random | wc -l
+awk 'NR!=1{print $1}' snptableUG_pass.tab.p240.random | sort | uniq -c | wc -l
+awk 'NR!=1{print $1}' snptableUG_pass.tab.p240.random.random | sort | uniq -c | wc -l
 ```
 
-B)
-Convert the SNPtable to a STRUCTURE readable format
+First, I lost my headers in the snp_coverage file, so I grep them from another table:
+
+```
+cat filtered_passed_snpsb.vcf | grep '#' > header
+cat header snptableUG_pass.tab.p240.random.random > snp240_1000.random
+```
+
+**B)    Convert the SNPtable to a STRUCTURE readable format**
 
  NOTE: the order of the digital numbers is mixed up (eg AC can now be read in by Structure as CA. This means linkage mapping is impossible with this data (see Structure documentation). This is caused by the coding used initially, which is by vcf2vertical_dep_GATK_UG.pl
 
@@ -186,11 +196,14 @@ cat("\n")
 Run this by typing (make sure to have R version 2.15 or higher loaded):
 
 ```
-Rscript snpTable2str.R <snptable> <poptable> <outfile>
+module load R/2.15.0
+Rscript snpTable2str.R snptableUG_pass.tab.48.random.random ../popind ../test_infile.stru
 ```
 
 ---
-C)
+
+**C) Setting up parameter files**
+
 Now, we need a set of mainparams and extraparams to start some runs. These parameters depend on the input file, as well as several assumptions made by the user. These assumptions depend on the situation (i.e. admixture, no admixture) or require tweaking by the user.
 
 Helpful information:
@@ -204,10 +217,11 @@ http://pritchardlab.stanford.edu/structure_software/release_versions/v2.3.4/stru
 >   Admixture model: assigns genotypes
 >   if alpha = 1 = flat prior
 >   Use long burning times (min 100,000)
->   Run replica runs for every chosen K, at least 20 per K.
+>   Run replica runs for every chosen K, at least 20 per K
+
 ---
 
-D)
+**D) Running STRUCTURE**
 Great! Now start some runs, preferably in parallel. Ideally, we want to work our way up the ultimate number of iterations and long burnin times, but start with some subsamples and small runs to evaluate the data.
 
 Option 1:
@@ -273,11 +287,142 @@ module load structure/2.3.4
 structure -K $K -o $out -D $seed
 ```
 
-qsub -v maxRep=10 -V -t 1-100 struc.job
+qsub -v maxRep=20 -V -t 1-100 struc.job
 
-E)
+---
+
+**E)    Make output R readable**
 
 Output from STRUCTURE cannot be used in R, needs to be parsed.
+
+```
+#struc_parse.sh
+#!/bin/sh
+search=$1
+out=chains_$search.txt
+echo "Searching for $search..."
+files=`find . -name "struc.job.o*" -exec grep -l "$search" {} \;`
+n=1
+for f in $files
+do
+if [ "$n" -eq "1" ]
+then
+grep -m1 "Rep" $f | sed 's/#://g ; s/[\s^\S\n]/\t/g' >$out
+fi
+sed -n '/BURNIN/,/MCMC complete/{ s/://g; s/[\s^\S\n]/\t/g; /^[0-9]/p}' <$f >>$out      
+n=$(($n + 1))
+done
+```
+
+bash struc_parse.sh K2 
+Note: be careful when parsing K1, it will also parse K2, so better type K1_ and change name of output file
+
+This will producee chains_K2_.txt etc
+
+The output gets really big if the number of runs and iterations are large. I have implemented my 'manual thinning', so I can analyse the runs quicker. All this is doing is removing datapoints, so from 1M points I go to 1,000, which is still a fair amount to check data.
+
+
+```
+awk '!(NR % 1000)' chains_K2_.txt > chain_K2_1000sum.txt
+```
+
+
+**F)    Run structureHarvester on structure outputs**
+
+http://users.soe.ucsc.edu/~dearl/software/structureHarvester/
+
+
+The output folder should also hold files that look similar to: ```output_K8_r6_f```. These are the files structureHarvester needs. Apparently this program is a little picky, and needs the input dir to be 'clean'. Move all the files that are direct outputs from the struc.jobs to job_files:
+
+```
+mv struc_au.* job_files
+``
+
+Make sure to also place harvesterCore.py in the same directory as structureHarvester.py
+NOTE: this script has to be WITHIN the dir where the in and output dirs are located, otherwise it won't run. Make sure to load python version 2.6.6
+
+```
+python structureHarvester.py --dir=structure_output --out=clumpp_files --evanno --clumpp
+```
+
+
+OR
+
+Zip all the *_f files (produced by STRUCTURE) and upload to
+http://taylor0.biology.ucla.edu/structureHarvester/
+
+
+**G)    Check convergence of chains**
+
+This output of pstruc_parse.sh and structureHarverster.py can be checked with structure_analysis.R
+
+```{r}
+#structure run analysis
+library(ggplot2)
+
+#first run the parse_struc.py script
+
+#load chain
+chain_k2 = read.table("chain_K2_sum.txt",header=T,na.strings='-')
+
+#plot alpha chains across Reps
+ggplot(chain_k2,aes(x=Step,y=Alpha,col=Rep))+geom_line()
+
+#check alpha histograms
+ggplot(chain_k2,aes(x=Alpha))+geom_histogram()+facet_grid(Rep~.)
+
+#plot LnLike chain
+ggplot(chain_k2,aes(x=Step,y=Ln_Like,col=Rep))+geom_line()
+
+#check Ln_Like histograms
+ggplot(chain_k2,aes(x=Ln_Like))+geom_histogram()+facet_grid(Rep~.)
+
+#check correlation between F
+ggplot(chain_k2,aes(x=F1,y=F2))+geom_point()+coord_fixed(0.5)+facet_grid(Rep~.)
+
+################################################################
+# plotting evanno data after applying structureHarvester.py
+
+evanno_res = read.table("evanno.txt",header=F,comment.char='#')
+names(evanno_res) = c("K","reps","mean_LnPK",	"sd_LnPK",	"Ln1K",	"Ln2K",	"Delta_K")
+
+ggplot(evanno_res, aes(x=K, y=mean_LnPK)) + geom_errorbar(aes(ymin=mean_LnPK-sd_LnPK, ymax=mean_LnPK+sd_LnPK), width=.1) + geom_line() + geom_point()
+
+ggplot(evanno_res, aes(x=K, y=Delta_K)) + geom_line() + geom_point()
+
+```
+
+**H) Running CLUMPP**
+https://web.stanford.edu/group/rosenberglab/clumpp.html
+
+CLUMPP expects a parameter file which is based on the number of clusters (K), the number of individuals or populations – depending on you're running datatype 0 or 1, 0 being for the indfiles and 1 for the population files – the number of runs (I think determined by the number of runs you ran in Structure) and other options. This parameter file will call output files produced by structureHarvester, K1.indfile, K1.popfile etc.
+
+In command line type
+```
+CLUMPP paramfile #mcc version
+```
+
+**I)Running Distruct**
+
+Rename the .output files from CLUMPP to .indivq and .popq for the indivual and population run respectively
+module load distrust
+distructLinux1.1
+ps K2.ps
+
+By ordering the labels in K*.names and K*.languages, you can change the order in the plot.
+By setting PRINT_INDIVS to 1, you print the q-scores per individual. Setting this to 0 will print the q-scores per population
+In K*perm, it is possible to specify the colours. The first colour in the list will be drawn first in the bar (bottom). The numbers in front will specify something with the q-value. It is really just messing around with these numbers to get the desired order of colours
+
+
+
+
+
+
+
+
+---
+Parse STRUCTURE output chains in python (not working)
+
 When using *option1* in *D*, use the python script parse_struc.py
 
 ```
@@ -361,114 +506,10 @@ python ~/scripts/parse_struc.py chain_K1_ #(etc, for every K)
 
 This will create a *sum.txt file for every K
 
-Option 2:
-struc_parse.sh:
-```
-#!/bin/sh
-
-search=$1
-out=chains_$search.txt
-
-echo "Searching for $search..."
-
-files=`find . -name "struc.job.o*" -exec grep -l "$search" {} \;`
-
-n=1
-
-for f in $files
-do
-if [ "$n" -eq "1" ]
-then
-grep -m1 "Rep" $f | sed 's/#://g ; s/[\s^\S\n]/\t/g' >$out
-fi
-sed -n '/BURNIN/,/MCMC complete/{ s/://g; s/[\s^\S\n]/\t/g; /^[0-9]/p}' <$f >>$out      
-n=$(($n + 1))
-done
-```
-
-bash struc_parse.sh K2 
-Note: be careful when parsing K1, it will also parse K2, so better type K1_ and change name of output file
-
-This will producee chains_K2.txt etc
-
-F)
-Run structureHarvester.py on structure outputs
-http://users.soe.ucsc.edu/~dearl/software/structureHarvester/
-
-Make sure to also place harvesterCore.py in the same directory as structureHarvester.py
-
-```
-python structureHarvester.py --dir=structure_output --out=clumpp_files --evanno --clumpp
-```
-
-NOTE: this script has to be WITHIN the dir where the in and output dirs are located, otherwise it won't run. Make sure to load python version 2.6.6'
-
-OR
-
-Zip all the *_f files (produced by STRUCTURE) and upload to
-http://taylor0.biology.ucla.edu/structureHarvester/
 
 
-G)
-This output can be checked with structure_analysis.R
 
-```{r}
-#structure run analysis
-library(ggplot2)
 
-#first run the parse_struc.py script
-
-#load chain
-chain_k2 = read.table("chain_K2_sum.txt",header=T,na.strings='-')
-
-#plot alpha chains across Reps
-ggplot(chain_k2,aes(x=Step,y=Alpha,col=Rep))+geom_line()
-
-#check alpha histograms
-ggplot(chain_k2,aes(x=Alpha))+geom_histogram()+facet_grid(Rep~.)
-
-#plot LnLike chain
-ggplot(chain_k2,aes(x=Step,y=Ln_Like,col=Rep))+geom_line()
-
-#check Ln_Like histograms
-ggplot(chain_k2,aes(x=Ln_Like))+geom_histogram()+facet_grid(Rep~.)
-
-#check correlation between F
-ggplot(chain_k2,aes(x=F1,y=F2))+geom_point()+coord_fixed(0.5)+facet_grid(Rep~.)
-
-################################################################
-# plotting evanno data after applying structureHarvester.py
-
-evanno_res = read.table("evanno.txt",header=F,comment.char='#')
-names(evanno_res) = c("K","reps","mean_LnPK",	"sd_LnPK",	"Ln1K",	"Ln2K",	"Delta_K")
-
-ggplot(evanno_res, aes(x=K, y=mean_LnPK)) + geom_errorbar(aes(ymin=mean_LnPK-sd_LnPK, ymax=mean_LnPK+sd_LnPK), width=.1) + geom_line() + geom_point()
-
-ggplot(evanno_res, aes(x=K, y=Delta_K)) + geom_line() + geom_point()
-
-```
-
-H)
-Running CLUMPP
-https://web.stanford.edu/group/rosenberglab/clumpp.html
-
-CLUMPP expects a parameter file which is based on the number of clusters (K), the number of individuals or populations – depending on you're running datatype 0 or 1, 0 being for the indfiles and 1 for the population files – the number of runs (I think determined by the number of runs you ran in Structure) and other options. This parameter file will call output files produced by structureHarvester, K1.indfile, K1.popfile etc.
-
-In command line type
-```
-CLUMPP paramfile #mcc version
-```
-
-I)
-Running Distruct
-Rename the .output files from CLUMPP to .indivq and .popq for the indivual and population run respectively
-module load distrust
-distructLinux1.1
-ps K2.ps
-
-By ordering the labels in K*.names and K*.languages, you can change the order in the plot.
-By setting PRINT_INDIVS to 1, you print the q-scores per individual. Setting this to 0 will print the q-scores per population
-In K*perm, it is possible to specify the colours. The first colour in the list will be drawn first in the bar (bottom). The numbers in front will specify something with the q-value. It is really just messing around with these numbers to get the desired order of colours
 
 
 -------

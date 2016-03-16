@@ -10,8 +10,21 @@ https://www.broadinstitute.org/gatk/guide/article?id=3225
 
 The vcf file is beautiful, but contains some info we're not that interested in, e.g. bad mapping qualities, loci with very low or high coverage, extreme heterozygosity, lot's of missing data, alleles with very low frequency etc. So we're going to filter that all out.
 
+The output of this process is 2 files filtered as:
 
-**A)Retrieve only raw SNPs from vcf file**
+- gatk_selectSNP.sh (remove indels) —> input is snps.raw.vcf, Output is raw_snps.vcf
+
+- vfc_gatk_hardfilter.sh (QD < 2, MQ < 40, MQRandSum < -12.5, ReadPosRankSum < -8) —> Input is raw_snps.vcf, Output is filtered_snps.vcf
+
+- grepping the passed SNPs —> Input is filtered_snps.vcf, Output is filtered_passed_snps.vcf
+
+- vcf2vertical_dep_GATK-UG.pl (GTqual >=20, MQ>=20, qual >= 20, dp = 5 - 240), note that mapping quality shouldn’t be necessary here as that was already done in the previous step —> input is filtered_passed_snps.vcf, Output is snptableUG_pass.tab
+
+- snp_coverage_p240.pl (heterozygosity =<70, MAF >= 0.05, SNPcallrate >= 50% of samples) —> Input is snptableUG_pass.tab, output is snptableUG.tab_p240.table
+OR snp_coverage_p48 (heterozygosity =<70, MAF >= 0.05, SNPcallrate >= 10% of samples) —> Input is snptableUG_pass.tab, output is snptableUG.tab_p48.table
+
+
+**A)    Retrieve only raw SNPs from vcf file**
 
 I don’t spend too much time on indels, as I am more interested in SNPs and it is uncertain in this case how reliable indels are. Below steps however, could also be followed for retrieving and filtering indels. This requires different treshholds, see Broad Institute website.
 
@@ -31,7 +44,7 @@ java -jar /opt/sw/gatk-3.1.1/GenomeAnalysisTK.jar \
 NOTE: I will still use grep -v 'INDELS', which will get everything BUT the indels, to make absolutely sure I don't have any indels
 
 
-**B)Filter vcf file**
+**B)    Filter vcf file**
 
 ```
 # vcf_gatk_hardfilter.sh
@@ -46,7 +59,22 @@ java -jar /opt/sw/gatk-3.1.1/GenomeAnalysisTK.jar \
 --filterName "my_snp_filter"  -o filtered_snps.vcf
 ```
 
-**C)Futher filterin vcf file. Custom edition**
+The file size should NOT have been reduced, as the only difference should be that the snps now contain a stamp ‘Pass’ or <Filtername>
+
+So I just got everything that has 'PASS', and make sure I get the header too. 
+
+```
+cat filtered_snps.vcf | grep 'PASS\|^#' > iltered_passed_snps.vcf 
+```
+
+Which is short for:
+
+```
+cat filtered_snps.vcf | grep '#' >> filtered_passed_snps.vcf
+cat filtered_snps.vcf | grep 'PASS' >> filtered_passed_snps.vcf
+```
+
+**C)    Further filtering vcf file. Custom edition**
 
 Now we will locate called SNPs and genotypes and filters on set quality and depth it will produce an 'N' for every position (SNP/individual) for which no genotype was
 called by UG or failing the filter we set.
@@ -67,12 +95,13 @@ Minimum and maximum individual read depth: Sometimes I have found genotypes bein
 
 
 ```
-cat filtered_snps.vcf | grep -v 'INDEL' | /nfs/home/hpcsci/lotteanv/scripts/vcf2vertical_dep_GATK-UG.pl > snptableUG.tab
+cat filtered_passed_snps.vcf | grep -v 'INDEL' | /nfs/home/hpcsci/lotteanv/scripts/vcf2vertical_dep_GATK-UG.pl > snptableUG_pass.tab
 ```
 
 Get the number of filtered SNPs:
+
 ```
-cat snptableUG.tab | grep Scaf* | wc -l
+cat snptableUG_pass.tab| grep SC2* | wc -l
 ```
 
 vcfdepth_lotte.pl is the exact same as vcf2vertical_dep_GATK-UG.pl but will produce
@@ -86,12 +115,12 @@ head(d) #R called my column V1
 hist(d$V1)
 ```
 
-**D)Filter SNPtable on population genetic parameters**
+**D)    Filter SNPtable on population genetic parameters**
 
 Get summary statistics and filter SNP table based on minor allele frequency, heterozygosity and missing data using snp_coverage.pl
 
 ```
-perl /nfs/home/hpcsci/lotteanv/scripts/snp_coverage.pl snptableUG.tab 
+perl /nfs/home/hpcsci/lotteanv/scripts/snp_coverage_p240.pl snptableUG_pass.tab
 ```
 
 Minor allele frequency: Low frequency SNPs could be due to errors and are not useful for
@@ -160,6 +189,15 @@ Check the number of SNPs gained through each method
 ```
 cat snptableUG.tab.table | wc -l
 ```
+
+
+
+There is another interesting step which can be preformed, which is called phasing. This is where we find out not only what the genotype is at each locus, but also from which of the 2 chromosomes (in a diploid organism) each allele is coming from. This information can be useful when looking at inversions etc
+
+and example of a walkthrough is on https://github.com/mgharvey/seqcap_pop
+
+
+
 ---
 
 **OPTIONAL** only necessary when scaffolds were seperated by AAAA to reduce genome size
