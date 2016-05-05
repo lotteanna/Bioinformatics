@@ -221,7 +221,7 @@ http://pritchardlab.stanford.edu/structure_software/release_versions/v2.3.4/stru
 
 ---
 
-**D) Running STRUCTURE**
+**D)	Running STRUCTURE**
 Great! Now start some runs, preferably in parallel. Ideally, we want to work our way up the ultimate number of iterations and long burnin times, but start with some subsamples and small runs to evaluate the data.
 
 Option 1:
@@ -257,7 +257,8 @@ bash par_struc.sh <max number of repetitions> <max number of tasks>
 OR Option 2 (much better option)
 
 log a job to run it parallel:
-`
+
+```
 #!/bin/sh
 #$ -S /bin/sh
 #$ -l h_rt=24:00:00
@@ -291,17 +292,15 @@ qsub -v maxRep=20 -V -t 1-100 struc.job
 
 ---
 
-**E)    Make output R readable**
+**E)    Make output readable for R**
 
 Output from STRUCTURE cannot be used in R, needs to be parsed.
 
 ```
-#struc_parse.sh
 #!/bin/sh
 search=$1
 out=chains_$search.txt
-echo "Searching for $search..."
-files=`find . -name "struc.job.o*" -exec grep -l "$search" {} \;`
+files=`find . -name "struc_au.o*" -exec grep -l "$search" {} \;`
 n=1
 for f in $files
 do
@@ -309,21 +308,30 @@ if [ "$n" -eq "1" ]
 then
 grep -m1 "Rep" $f | sed 's/#://g ; s/[\s^\S\n]/\t/g' >$out
 fi
-sed -n '/BURNIN/,/MCMC complete/{ s/://g; s/[\s^\S\n]/\t/g; /^[0-9]/p}' <$f >>$out      
+sed -n '/BURNIN/,/MCMC complete/{ s/://g; s/[\s^\S\n]/\t/g; /^[0-9]/p}' <$f >>$out
 n=$(($n + 1))
 done
 ```
 
-bash struc_parse.sh K2 
-Note: be careful when parsing K1, it will also parse K2, so better type K1_ and change name of output file
+Run with:
 
-This will producee chains_K2_.txt etc
+```
+bash parse.sh K2_
+```
 
-The output gets really big if the number of runs and iterations are large. I have implemented my 'manual thinning', so I can analyse the runs quicker. All this is doing is removing datapoints, so from 1M points I go to 1,000, which is still a fair amount to check data.
+Note: be careful when parsing K1, it will also parse K2, so better type K1_ and change 
+name of output file
+
+This will produce chains_K2_.txt etc
+
+The output gets really big if the number of runs and iterations are large. I have 
+implemented my 'manual thinning', so I can analyse the runs quicker. All this is doing is
+ removing datapoints, so from 1M points I go to 1,000, which is still a fair amount to check data.
 
 
 ```
-awk '!(NR % 1000)' chains_K2_.txt > chain_K2_1000sum.txt
+for i in chains_*.txt;
+do awk '!(NR % 1000)' $i > ${i/.txt/}1000sum.txt; done
 ```
 
 
@@ -336,12 +344,14 @@ The output folder should also hold files that look similar to: ```output_K8_r6_f
 
 ```
 mv struc_au.* job_files
-``
+```
 
 Make sure to also place harvesterCore.py in the same directory as structureHarvester.py
-NOTE: this script has to be WITHIN the dir where the in and output dirs are located, otherwise it won't run. Make sure to load python version 2.6.6
+NOTE: this script has to be WITHIN the dir where the in and output dirs are located, otherwise it won't run. 
+Make sure to load python version 2.6.6
 
 ```
+module load python/2.6.6 
 python structureHarvester.py --dir=structure_output --out=clumpp_files --evanno --clumpp
 ```
 
@@ -386,7 +396,9 @@ ggplot(chain_k2,aes(x=F1,y=F2))+geom_point()+coord_fixed(0.5)+facet_grid(Rep~.)
 evanno_res = read.table("evanno.txt",header=F,comment.char='#')
 names(evanno_res) = c("K","reps","mean_LnPK",	"sd_LnPK",	"Ln1K",	"Ln2K",	"Delta_K")
 
-ggplot(evanno_res, aes(x=K, y=mean_LnPK)) + geom_errorbar(aes(ymin=mean_LnPK-sd_LnPK, ymax=mean_LnPK+sd_LnPK), width=.1) + geom_line() + geom_point()
+ggplot(evanno_res, aes(x=K, y=mean_LnPK)) + 
+		geom_errorbar(aes(ymin=mean_LnPK-sd_LnPK, ymax=mean_LnPK+sd_LnPK), width=.1) + 
+		geom_line() + geom_point()
 
 ggplot(evanno_res, aes(x=K, y=Delta_K)) + geom_line() + geom_point()
 
@@ -395,23 +407,37 @@ ggplot(evanno_res, aes(x=K, y=Delta_K)) + geom_line() + geom_point()
 **H) Running CLUMPP**
 https://web.stanford.edu/group/rosenberglab/clumpp.html
 
-CLUMPP expects a parameter file which is based on the number of clusters (K), the number of individuals or populations – depending on you're running datatype 0 or 1, 0 being for the indfiles and 1 for the population files – the number of runs (I think determined by the number of runs you ran in Structure) and other options. This parameter file will call output files produced by structureHarvester, K1.indfile, K1.popfile etc.
+CLUMPP expects a parameter file which is based on the number of clusters (K), the number 
+of individuals or populations – depending on you're running datatype 0 or 1, 0 being for
+the indfiles and 1 for the population files – the number of runs (I think determined by 
+the number of runs you ran in Structure) and other options. This parameter file will call 
+output files produced by structureHarvester, K1.indfile, K1.popfile etc.
+
 
 In command line type
 ```
-CLUMPP paramfile #mcc version
+module load clumpp
+CLUMPP param_ind
+CLUMPP param_pop
 ```
 
 **I)Running Distruct**
 
-Rename the .output files from CLUMPP to .indivq and .popq for the indivual and population run respectively
-module load distrust
-distructLinux1.1
+Rename the .output files from CLUMPP to .indivq and .popq for the indivual and population 
+run respectively
+
+```
+
+```
+
 ps K2.ps
 
 By ordering the labels in K*.names and K*.languages, you can change the order in the plot.
 By setting PRINT_INDIVS to 1, you print the q-scores per individual. Setting this to 0 will print the q-scores per population
-In K*perm, it is possible to specify the colours. The first colour in the list will be drawn first in the bar (bottom). The numbers in front will specify something with the q-value. It is really just messing around with these numbers to get the desired order of colours
+In K*perm, it is possible to specify the colours. The first colour in the list will be 
+drawn first in the bar (bottom). 
+The numbers in front will specify something with the q-value. 
+It is really just messing around with these numbers to get the desired order of colours
 
 
 

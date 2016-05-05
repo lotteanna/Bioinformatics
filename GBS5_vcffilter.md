@@ -162,7 +162,7 @@ lst<-gsub("\\\\.","-",lst) #doesn't work
 Count the total number of N's for each individual
 
 ```
-countN<-sapply(lst,FUN=function(x,df){sum(df[,x]=="N",na.rm=T)},df)
+countN<-sapply(lst,FUN=function(x,d){sum(d[,x]=="N",na.rm=T)},d)
 ```
 
 Calculate the percentage of N per SampleID divided by total number of SNPs
@@ -176,8 +176,8 @@ And make a histogram
 ```
 hist(percN)
 ```
-write.table(percN,"percN_filt192i.txt",quote=F,sep="\t")
-#write.table(countN,"countN_filt192i.txt",quote=F,sep="\t")
+write.table(percN,"percN_diffMAF.txt",quote=F,sep="\t")
+write.table(countN,"countN_diffMAF.txt",quote=F,sep="\t")
 ```
 lst<-gsub(pattern = "X",replacement = "",colnames(d[,-(1:2)]))
 

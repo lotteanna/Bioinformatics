@@ -4,6 +4,14 @@ BAYENV ===
 **This script requires climate data. Produce this data with
 QGIS_coordinate_climatevalue_Walkthrough.md**
 
+BAYENV:
+1) Variance covariance matrix with subset, multiple runs  
+2) Check convergence MCMC runs/correlation matrices (cov2cor in R)  
+3) XTX on subset —> identify outliers  
+4) remove outliers original subset and repeat 1&2  
+5) Env/xtx  on complete dataset (using corrected variance/covariance matrix)  
+
+
 A) **Transform SNPtable to Bayenv format**
 
 To transform the custom-filtered SNPtable to Bayenv(2) format, we need a file showing the
@@ -259,11 +267,39 @@ Each column is a population, in the same order as the SNPSFILE and input file.
 
 
 2]  The matrix_file is a summary or excerpt from above "matrices". Either average among all computed
-covariance matrices (not done here), or use the last one. Note that bayenv is VERY sensitive in the
-use of whitespaces vs tabs, and a simple copy paste might change tabs into whitespaces. To replace
+covariance matrices (not done here, needs evaluation of convergence), or use the last one. 
+Note that bayenv is VERY sensitive in the use of whitespaces vs tabs, and a simple copy 
+paste might change tabs into whitespaces. To replace
 multiple spaces with a single tab, use the following:
 
 ``` cat spaced-file | sed 's/ \+/\t/g' > tabbed-file ```
+
+Another option is to yank the lines out if the matrix file. Go to the first line of the last matrix
+<linenumber>gg and type the number of lines you want to copy (should be equal to number of populations in your file
+<numberoflines>yy. Go to a new file and type p.    
+If there are more then 50 lines, we need to adjust vim to store more in the registers. Type
+```:set viminfo='20,<1000,s1000```
+Followed by the yanking.
+
+Open the new file and simply type <p>
+
+Now, you want to average over multiple covariance matrices from diffferent runs. Paste all the
+funal matrices of each run into a new file and load R to get a mean matrix:
+
+```
+module load R
+A<-read.table("matrix_sel2_allr")
+B<-read.table("matrix_sel_allr")
+C<-read.table("matrix_sel3_allr")
+D<-read.table("matrix_sel4_allr")
+E<-read.table("matrix_sel5_allr")
+
+my.list<-list(A,B,C,D,E)
+meanm<-Reduce("+", my.list) / length(my.list)
+write.table(meanm,"mean_matrixallr",sep="\t",col.names=FALSE,row.names=FALSE)
+```
+
+
 
 3] SNPfiles contain the allele counts (on 2 lines for diploids) for ONE SNP ONLY. This means that
 SNPSFILE needs to be cut into little pieces. Below script will do this. Sidenote on this script:
@@ -317,9 +353,9 @@ for(my $f=0; $f < $len; $f++){
 
 ```
 
-Run this script as below. au41_48.bay.txt is the SNPSFILE
+Run this script as below. au42_48.bay.txt is the SNPSFILE
 
-``` perl bayenv_split.pl au41_48.bay.txt ```
+``` perl bayenv_split.pl au42_48.bay.txt ```
 
 This will produce files containing information for every locus, the SNPfiles. Note that the above
 script is producing the right number of files in the right order, but the naming is off, as it skips
