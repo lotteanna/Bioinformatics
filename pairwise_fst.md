@@ -2,9 +2,9 @@ Creating p-values for pairwise Fst values
 ===
 
 Code by:
-Thibaut Jombart 
-Philip Chan 
-Lotte van Boheemen 
+> Thibaut Jombart 
+> Philip Chan 
+> Lotte van Boheemen 
 
 ---
 
