@@ -1,6 +1,36 @@
+Creating p-values for pairwise Fst values
+===
 
-And below is the R script, called matperm.R in the jobscript in the previous email. You need to check the "read.structure" part of the code to be correct for your infile, i.e. define n.ind (number of individuals in your infile), number of lines per individual (if one, onerowperind=TRUE), specify column with individual names (col.lab=<column number>), names of populations (col.pop=<column number>), NA character used and number of populations in infile (pop=<#>). Best is to read it into R on your computer before submitting, and check if it understands what your are feeding it. If it tells you below, you are doing great
- Converting data from a STRUCTURE .stru file to a genind object... 
+Code by
+Thibaut Jombart
+Philip Chan
+Lotte van Boheemen
+
+---
+
+As there seems to be a lack of packages able to calculate p-values for
+pairwise FSTs for large datasets, I decided to pull together some code
+and get a calculation set up for R. My script is based on a script by Thibaut Jombart at
+http://lists.r-forge.r-project.org/pipermail/adegenet-forum/2011-February/000214.html
+and all you need it is to use your favourite datafile to read into a genind object
+(that is the adegenet package). 
+
+The largest problem I was having was the time it took to do a decent
+number of permutations to get the p-values. Doing it on my computer,
+it would take ~1 day for 10 perms (one permutation gives one matrix
+with pairwise fsts draws from a random distribution, your 0
+hypothesis), but you need 1000 (=1000 pfst matrices) at least (I do
+have 85 pops so this is contributing to the duration). For this
+reason, what you can do is send it to the cluster in an array, where
+each array is analysing a subset (let's say 10 matrices). Then, all
+you need to do is concatenate the files and do an additional step
+which actually calculates your p-values. What that final step does is
+testing if your observed fst matrix is within the 1000 random
+matrixes, for every value within the matrix. If an observed value (say
+pop 1 vs pop 2) is greater then 950 of the 1000 values of pop1 vs pop2
+in the permutated matrices, it is significant (p <0.05).
+
+**This script DOES NOT work on the MCC, you need to load your data onto Monarch.**
 
 ```
 ##R-script to draw perutated values from the pairwise matrix on the cluster
