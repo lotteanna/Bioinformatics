@@ -157,4 +157,5 @@ egrep -v 'sim|obs|alter|rep|expvar|cal' allTests.txt > redTests.txt
 Remove all the other unnecessary stuff (in the most clunky way)
 ```
 sed -i -e 's/## //' redTests.txt
+```
 
