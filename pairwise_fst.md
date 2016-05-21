@@ -2,7 +2,7 @@
 And below is the R script, called matperm.R in the jobscript in the previous email. You need to check the "read.structure" part of the code to be correct for your infile, i.e. define n.ind (number of individuals in your infile), number of lines per individual (if one, onerowperind=TRUE), specify column with individual names (col.lab=<column number>), names of populations (col.pop=<column number>), NA character used and number of populations in infile (pop=<#>). Best is to read it into R on your computer before submitting, and check if it understands what your are feeding it. If it tells you below, you are doing great
  Converting data from a STRUCTURE .stru file to a genind object... 
 
-
+```
 ##R-script to draw perutated values from the pairwise matrix on the cluster
 
 library("adegenet")
@@ -16,18 +16,16 @@ allr<-read.structure("allcra473_240_in.stru", n.ind=473, n.loc=1000, onerowperin
 mat.perm <- pairwise.fst(allr, pop=sample(pop(allr)), res.type="matrix")
 #write the output to a file with taskID as identifier
 write.table(mat.perm,paste("perm_allr.txt"),sep="\t")
-
+```
 
 
 Below is the job script. in this script, just change the time  and in one of your final lines change
-cp -p ../../all* .:
-to
-cp -p ../../<whatever your structure file is named> .
 
+```cp -p ../../all* . ``` to ```
+cp -p ../../<whatever your structure file is named> . ```
 
 
 ```
-
 #!/bin/env bash
 #SBATCH --job-name=matperm
 #SBATCH --time=50:00:00
