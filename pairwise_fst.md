@@ -190,3 +190,13 @@ Remove all the other unnecessary stuff (in the most clunky way)
 sed -i -e 's/## //' redTests.txt
 ```
 
+Move everything to two columns:
+
+```
+awk 'ORS=NR%2?" ":"\n"' redTests.txt > permpvaluesFstAll.txt
+```
+
+Now, I have a nice (long) list of all the p-values, which might be a little annoying to work with and put manually in a matrix (for me there are 7056 values).
+What you can do is use the matrix previously calculated (mat.obs) and open this is excel.
+Here, you replace each Fst value with <namePop1>&"-"&<namePop1> by selecting the cells they are in. Don't forget to appropriately 'lock' rows or columns in the formula with $.
+Then, a vlookup table will allow you to quickly find the names and associated p-values in your list. Voila!
