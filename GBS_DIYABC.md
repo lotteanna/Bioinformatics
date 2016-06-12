@@ -32,7 +32,6 @@ So I either have to subset my vcf file, or I have to subset and rename pops in t
 file. Possibly the first option is better as the header might be written based on
 information found in the vcf file. Then I need to check if the vcf is holding any information I don't want
 
-This is working, so now I need 
 
 **B)	Filter SNP datafile**
 
@@ -116,6 +115,18 @@ subset<-cbind(sdata[,1:3],sdata[,sample(ncol(sdata), 1000)])
 write.table(subset,"diyabc1000_snp50MAF.05_all")
 ```
 
+This will give every column a number and we don't need this. So find all characters 
+starting with "A." and replace with A:
+
+```
+sed -E ’s/A.[^ ]*/A/g’ diyabc_snp50MAF.05_all > test
+```
+
+Remove all quotes in the file
+
+```
+sed 's/\"//g' test > diyabc_snp50MAF.05_all
+```
 
 *C)	Recode populations**
 

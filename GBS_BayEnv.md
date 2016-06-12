@@ -234,6 +234,7 @@ command is
 
 ``` qsub -t 1-100 bayenv2.job ```
 
+
 **C)    Run Bayenv with env file**
 
 This step will require 3 input files, ENV, SNPFILE and MATRIX_FILE. The latter 2 look the same as
@@ -284,7 +285,7 @@ Followed by the yanking.
 Open the new file and simply type <p>
 
 Now, you want to average over multiple covariance matrices from diffferent runs. Paste all the
-funal matrices of each run into a new file and load R to get a mean matrix:
+final matrices of each run into a new file and load R to get a mean matrix:
 
 ```
 module load R
@@ -300,75 +301,179 @@ write.table(meanm,"mean_matrixallr",sep="\t",col.names=FALSE,row.names=FALSE)
 ```
 
 
-
 3] SNPfiles contain the allele counts (on 2 lines for diploids) for ONE SNP ONLY. This means that
 SNPSFILE needs to be cut into little pieces. Below script will do this. Sidenote on this script:
-authorship is unknown, copied from shared folder, edits by Simon Michnowicz
+authorship is unknown, copied from shared folder, edits by Simon Michnowicz & Philip Chan
 
 ```	
+#bayenv.pl
 #!/usr/bin/perl
+
 my $in = $ARGV[0]; #merged bsnp table loci (rows) pop (columns)
+my $which = $ARGV[1];  # int that identifies which block of two lines to process
+my $tmpdir = $ARGV[2];  # temporary directory to stash the lociXXXX files
+
 my @array=();
 print "Input file is $in\n";
 open IN, $in;
 while (<IN>){
-        chomp;
-        push (@array, $_);
-#       print "$_\n";           
+   chomp;
+   push (@array, $_);
+#  print "$_\n";           
 }
 close IN;
+
 my $len=$#array+1;
 my $counter=1;
-print "Size of input file is $len lines\n";
+#print "Size of input file is $len lines\n";
 
-my $fileIndex;
-for(my $f=0; $f < $len; $f++){
-        print "Index is $f\n";
-        if ($counter==1){
-                $counter=2;
-                $fileIndex=$f+1;
-                open OUT, ">loci$fileIndex";
-                my @temp=split(" ",$array[$f]);
-                foreach (@temp){
-                        print OUT "$_\t";
-                }
+my $fileIndex = $which;
+my $which = ($which-1) * 2;
+
+for(my $f=$which; $f < $len; $f++){
+   print "Index is $f\n";
+   if ($counter==1) {
+      $counter=2;
+      $fileIndex=$which;
+
+      open OUT, ">$tmpdir/loci$fileIndex";
+      my @temp=split(" ", $array[$f]);
+      foreach (@temp){
+          print OUT "$_\t";
+      }
                 print OUT "\n";
-        }elsif ($counter == 2){
-                $counter=1;
+    }
+    elsif ($counter == 2) {
+      $counter=1;
 
-                my @temp=split(" ", $array[$f]);
-                foreach (@temp){
-                        print OUT "$_\t";
+      my @temp=split(" ", $array[$f]);
+      foreach (@temp){
+         print OUT "$_\t";
+      }
+      print OUT "\n";
+      close OUT;
+       #print "Fileanme=loci$fileIndex\n";
 
-                }
-                print OUT "\n";
-                close OUT;
-                print "Fileanme=loci$fileIndex\n";
-                my $command="bayenv2 -i loci$fileIndex -m matrix -e env -p 7 -k 10000 -n 23 -t -r 429";
-                print   "$command\n";
-                                system ("$command");
-                }
+      my $command="bayenv2 -i $tmpdir/loci$fileIndex -m mean_matrixallr -e env -p 85 -k 500000 -n 23 -t -X -r 429 -o bf_$fileIndex";
+
+      print   "$command\n";
+      system ("$command");
+      #system "rm loci*";
+      exit 0;
+    }
 }
-#system "rm loci*";
 
 ```
 
-Run this script as below. au42_48.bay.txt is the SNPSFILE
+Run this script as below. allr473_allsnp48.bay.txt is the SNPSFILE
 
-``` perl bayenv_split.pl au42_48.bay.txt ```
+``` perl bayenv.pl allr473_allsnp48.bay.txt  ```
 
 This will produce files containing information for every locus, the SNPfiles. Note that the above
 script is producing the right number of files in the right order, but the naming is off, as it skips
 every even number.
+
+Now, this script can become really terrible with many SNPs as it will spit out a file for every 2 lines in your infile. Therefore, the above script should be used together with below script and run on the cluster. Below job script is written by Philip Chan, and will create parent and child directories for the SNPs
+
+```
+#!/bin/sh
+### job shell -S
+#$ -S /bin/sh
+#$ -cwd
+#$ -N BayEallr
+#$ -l h_rt=200:00:00
+#$ -l h_vmem=12G
+#$ -o bayEallr.log 
+#$ -e bayEallr.err
+#$ -l dpod=1
+#$ -l passwd=lotteanv
+#$ -pe smp 4
+#$ -m n
+#$ -t 1-30420
+
+. /etc/profile
+module load bayenv2
+
+ID=$SGE_TASK_ID
+
+P=`expr $ID / 1000`
+C=`expr $ID % 1000`
+
+PDIR=`printf "%02d" $P`
+CDIR=`printf "%03d" $C`
+
+echo "Working on $PDIR / $CDIR"
+
+if [ ! -d $PDIR ]
+then
+  mkdir $PDIR
+  fi
+
+cd $PDIR
+
+if [ ! -d $CDIR ]
+then
+  mkdir $CDIR
+fi
+
+cd $CDIR
+
+IND=`expr $ID - 1`
+INDEX=`expr $IND \* 2`
+
+if [ -f bf_$INDEX.bf ]
+then
+  echo "Output file for $PDIR / $CDIR already present!"
+  exit 0
+fi
+
+pwd
+
+cp -p ../../env .
+cp -p ../../*matrix* .
+
+ulimit -s 100000
+perl ../../bayenv.pl ../../allr473_allsnp48.bay.txt $ID $TMPDIR > out 2> err
+```
+
+Set -t to the number of SNPs in your infile, change the name of your environment file and mean covariance matrix in below: 
+```
+cp -p ../../env .
+cp -p ../../*matrix*
+```
 
 **D)	Running XtX matrix**
 
 We can use the same script as above to run the XtX matrices. This also requires an environment input
 file, but won't use it. The -t flag is left out, the -X flag is added. For this, we can also create a dummy environment file, filled with 0 and the amount of columns as populations
 
+Note that this script will also run the environment test if a correct environment file is given
+```
 bayenv2 -i loci1a -m matrix_sel_allcra -e env -p 86 -k 100000 -n 1 -t -X -r 429
+```
 
 Or change in bayenv_split:
 ```
 my $command="bayenv2 -i loci$fileIndex -m matrix -e env -p 7 -k 100000 -n 23 -t -X -r 429";
+```
+
+**E)	Pasting the results together**
+
+Now all the results are in subfolders with one file per directory. We want to extract all this information and put it in the same file.
+```
+cat */*/.bf > bf_result_allr
+cat */*/.xtx > xtx_result_allr
+```
+
+This needs to be done in every replicate run (with different roots), over which we can then average the values
+
+```
+module load R
+A<-read.table("bf_result_allr_run1")
+B<-read.table("bf_result_allr_run2")
+C<-read.table("bf_result_allr_run3")
+
+my.list<-list(A,B,C)
+meanm<-Reduce("+", my.list) / length(my.list)
+write.table(meanm,"bf_result_allr_mean",sep="\t",col.names=FALSE,row.names=FALSE)
 ```

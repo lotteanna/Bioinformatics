@@ -146,22 +146,71 @@ vcftools --vcf filt_complete.vcf --geno-r2 --out aaaa8
 ```
 
 
-Filtering with different MAF
+Filtering with  MAF
 
 ```
-vcftools --vcf filt_complete.vcf --maf 0.025 --recode --recode-INFO-all --out filt_completeMAF.025.vcf
-vcftools --vcf filt_complete.vcf --maf 0.01 --recode --recode-INFO-all --out filt_completeMAF.01.vcf
 vcftools --vcf filt_complete.vcf --maf 0.05 --recode --recode-INFO-all --out filt_completeMAF.05.vcf
 ```
 
+Filter based on absolute missing number of genotypes or missing % or genotypes 
 
-Used previously to filter 
 ```
-cat filtered_snps.vcf | grep 'PASS\|^#' > filtered_passed_snps.vcf 
+vcftools --vcf filt_completeMAF.05.vcf --max-missing-count 240 --recode --out filt_completeMAF.05.50miss.vcf
+
+VCFtools - 0.1.14
+(C) Adam Auton and Anthony Marcketta 2009
+
+Parameters as interpreted:
+	--vcf filt_completeMAF.05.vcf
+	--max-missing-count 240
+	--out filt_completeMAF.05.50miss.vcf
+	--recode
+
+After filtering, kept 480 out of 480 Individuals
+Outputting VCF file...
+After filtering, kept 4904 out of a possible 152264 Sites
+Run Time = 31.00 seconds
+```
+
+```
+vcftools --vcf filt_completeMAF.05.vcf --max-missing 0.5 --recode --out filt_completeMAF.05.50miss.vcf
+```
+
+```
+VCFtools - 0.1.14
+(C) Adam Auton and Anthony Marcketta 2009
+
+Parameters as interpreted:
+	--vcf filt_completeMAF.05.vcf
+	--max-missing 0.5
+	--out filt_completeMAF.05.50miss.vcf
+	--recode
+
+After filtering, kept 480 out of 480 Individuals
+Outputting VCF file...
+After filtering, kept 9360 out of a possible 152264 Sites
+Run Time = 38.00 seconds
+```
+Interesting that there is a difference between the 2…. Used the last one (missing percentage)
+
+```
+mv filt_completeMAF.05.50miss.vcf.recode.vcf filt_completeMAF.05.50miss.vcf
+```
+
+To select only 1 SNP per contig (to fulfil the assumption of unlinked loci, as necessary
+in diyab. NOTE: Don't do this unless there is an explicit reason to do so (as this will
+bias your data)!
+
+```
+awk '!seen[$1]++' filt_completeMAF.05.50miss.vcf > test
+```
+
+Count how many SNPs are left
+```
+cat test| grep -v "##" | wc -l
 ```
 
 
-- MAF? Check literature
 
 
 **C)    Further filtering + conversion of vcf file. Custom edition**
