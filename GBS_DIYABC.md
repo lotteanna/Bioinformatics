@@ -142,3 +142,20 @@ around to scripting this yet.
 
 To get the best format, copy out of excel into TextWrangler and save as .snp
 
+
+** Run on cluster**
+
+Also submitted scenarios with changed priors (cra2 and cra3, latter has t3 removed)
+(a) I extracted the tar file using: tar xf cra2_na3_eu1_reftableCluster.tar
+(b) I copied the two *.sh files from inside the cra2_na3_eu1_2016_7_1-1/ into this directory
+(c) I edited the launch.sh file. Please compare launch.sh and the launch.tar within cra2_na3_eu1_2016_7_1-1
+(d) I also have to remove the RNG bin file... as the launch command is asking me to BECAREFULL
+(e) I also created a symbolic link using:
+     ln -sf ~/pc/diyabc-comput-linux-x64 general
+(f) Copy LOCKFILE to this folder
+(g) Then I run launch.sh 
+    SS ./launch.sh
+
+where SS is my program to start another program but allows you to logout and this program will not terminated after
+you exit the SSH session. The output of the "launch.sh" program will appear in a text file under /tmp/
+

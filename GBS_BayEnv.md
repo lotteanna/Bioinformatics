@@ -6,7 +6,7 @@ QGIS_coordinate_climatevalue_Walkthrough.md**
 
 BAYENV:
 1) Variance covariance matrix with subset, multiple runs  
-2) Check convergence MCMC runs/correlation matrices (cov2cor in R)  
+2) Check convergence MCMC runs/correlation matrices (cov2cor in R) # not in this walkthrough 
 3) XTX on subset —> identify outliers  
 4) remove outliers original subset and repeat 1&2  
 5) Env/xtx  on complete dataset (using corrected variance/covariance matrix)  
@@ -209,6 +209,7 @@ information in the file.
 
 **B)    Estimate covariance matrix**
 
+
 First, we need to make the covariance matrix. This will take a long time.
 
 In below command (for BAYENV), the first '0' indicates we want to estimate the covariance matrix,
@@ -234,7 +235,28 @@ command is
 
 ``` qsub -t 1-100 bayenv2.job ```
 
+```
+#!/bin/sh
+### job shell -S
+#$ -S /bin/sh
+### keep yours files together in the same directory
+#$ -cwd
+### descriptive name of job, avoid spaces
+#$ -N covau2
+### walltime hh:mm:ss per subjob
+#$ -l h_rt=100:00:00
+### memory requirements
+#$ -l h_vmem=10G
+#$ -o covau2.log 
+#$ -e covau2.err
+#$ -pe smp 4
+#$ -M lotte.van.boheemen@monash.edu
+#$ -m abes
 
+. /etc/profile
+module load bayenv2
+bayenv2 -i au42_48.bay.txt  -p 7  -k 1000000 -r 52681 > matrix_aurun2.out
+```
 **C)    Run Bayenv with env file**
 
 This step will require 3 input files, ENV, SNPFILE and MATRIX_FILE. The latter 2 look the same as
@@ -352,10 +374,10 @@ for(my $f=$which; $f < $len; $f++){
       }
       print OUT "\n";
       close OUT;
-       #print "Fileanme=loci$fileIndex\n";
 
-      my $command="bayenv2 -i $tmpdir/loci$fileIndex -m mean_matrixallr -e env -p 85 -k 500000 -n 23 -t -X -r 429 -o bf_$fileIndex";
+      #print "Fileanme=loci$fileIndex\n";
 
+      my $command="bayenv2 -i $tmpdir/loci$fileIndex -m mean_matrixau -e env -p 7 -k 500000 -n 23 -t -X -r 666 -o bf_$fileIndex";
       print   "$command\n";
       system ("$command");
       #system "rm loci*";
@@ -377,18 +399,32 @@ Now, this script can become really terrible with many SNPs as it will spit out a
 
 ```
 #!/bin/sh
+
 ### job shell -S
 #$ -S /bin/sh
+
+### keep yours files together in the same directory
 #$ -cwd
-#$ -N BayEallr
+
+### descriptive name of job, avoid spaces
+#$ -N BayEau
+
+### walltime hh:mm:ss per subjob
 #$ -l h_rt=200:00:00
+
+### memory requirements
 #$ -l h_vmem=12G
-#$ -o bayEallr.log 
-#$ -e bayEallr.err
+
+#$ -o bayEau.log 
+#$ -e bayEau.err
+
 #$ -l dpod=1
 #$ -l passwd=lotteanv
+
 #$ -pe smp 4
+
 #$ -m n
+
 #$ -t 1-30420
 
 . /etc/profile
@@ -407,14 +443,14 @@ echo "Working on $PDIR / $CDIR"
 if [ ! -d $PDIR ]
 then
   mkdir $PDIR
-  fi
+fi
 
 cd $PDIR
 
 if [ ! -d $CDIR ]
 then
   mkdir $CDIR
-fi
+  fi
 
 cd $CDIR
 
@@ -433,13 +469,7 @@ cp -p ../../env .
 cp -p ../../*matrix* .
 
 ulimit -s 100000
-perl ../../bayenv.pl ../../allr473_allsnp48.bay.txt $ID $TMPDIR > out 2> err
-```
-
-Set -t to the number of SNPs in your infile, change the name of your environment file and mean covariance matrix in below: 
-```
-cp -p ../../env .
-cp -p ../../*matrix*
+perl ../../bayenv.pl ../../bay_au $ID $TMPDIR > out 2> err
 ```
 
 **D)	Running XtX matrix**
