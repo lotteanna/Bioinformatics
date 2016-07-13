@@ -1,18 +1,20 @@
-BAYENV ===
+BAYENV 
+===
 
 
-**This script requires climate data. Produce this data with
+**This script requires climate data. Produce this data with  
 QGIS_coordinate_climatevalue_Walkthrough.md**
 
-BAYENV:
+BAYENV:  
 1) Variance covariance matrix with subset, multiple runs  
 2) Check convergence MCMC runs/correlation matrices (cov2cor in R) # not in this walkthrough 
 3) XTX on subset —> identify outliers  
 4) remove outliers original subset and repeat 1&2  
 5) Env/xtx  on complete dataset (using corrected variance/covariance matrix)  
+-------------
 
-
-A) **Transform SNPtable to Bayenv format**
+**A) Transform SNPtable to Bayenv format**
+===
 
 To transform the custom-filtered SNPtable to Bayenv(2) format, my choice was to use PGDspider to change the input file for Structure.
 http://www.cmpg.unibe.ch/software/PGDSpider/. 
@@ -25,8 +27,10 @@ The script in GBS6_STRUCTURE will output a file with diploid data on 2 consecuti
 no phase information, missing value code of -9, SNP format, inclusion of locus, individual
 names and population identifier. There is no additional information in the file.
 
+-------------
 
 **B)    Estimate covariance matrix**
+===
 
 
 First, we need to make the covariance matrix. This will take a long time.
@@ -65,7 +69,11 @@ command is
 module load bayenv2
 bayenv2 -i au42_48.bay.txt  -p 7  -k 500000 -r 52681 > matrix_aurun2.out
 ```
+
+--------------
+
 **C)    Run Bayenv with env file**
+===
 
 This step will require 3 input files, ENV, SNPFILE and MATRIX_FILE. The latter 2 look the same as
 files produced/used above, but they are not! The code to run this is as follows (don't run yet, I am
@@ -280,7 +288,10 @@ ulimit -s 100000
 perl ../../bayenv.pl ../../bay_au $ID $TMPDIR > out 2> err
 ```
 
+--------------
+
 **D)	Running XtX matrix**
+===
 
 We can use the same script as above to run the XtX matrices. This also requires an environment input
 file, but won't use it. The -t flag is left out, the -X flag is added. For this, we can also create a dummy environment file, filled with 0 and the amount of columns as populations
@@ -295,7 +306,10 @@ Or change in bayenv_split:
 my $command="bayenv2 -i loci$fileIndex -m matrix -e env -p 7 -k 100000 -n 23 -t -X -r 429";
 ```
 
+-------------
+
 **E)	Pasting the results together**
+===
 
 Now all the results are in subfolders with one file per directory. We want to extract all this information and put it in the same file.
 ```
