@@ -11,6 +11,7 @@ BAYENV:
 3) XTX on subset —> identify outliers  
 4) remove outliers original subset and repeat 1&2  
 5) Env/xtx  on complete dataset (using corrected variance/covariance matrix)  
+
 -------------
 
 **A) Transform SNPtable to Bayenv format**
